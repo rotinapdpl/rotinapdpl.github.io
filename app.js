@@ -2,7 +2,7 @@
    Carregado depois do código principal; troca o armazenamento do Claude pelo Firebase. */
 (function () {
 "use strict";
-const APP_VERSION = "4.0";
+const APP_VERSION = "4.0.1";
 const cfg = window.FIREBASE_CONFIG || {};
 const iso = () => new Date().toISOString();
 const ROLES = {pendente: "Aguardando aprovação", estagiario: "Estagiário", tecnico: "Técnico", admin: "Coordenação", bloqueado: "Bloqueado"};
@@ -328,6 +328,7 @@ saveFile = async function (filename, data) {
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); return true;
   } catch (e) { toast("Não foi possível baixar agora."); return false; }
 };
+downloads = {save: async ({filename, data}) => { if (!(await saveFile(filename, data))) throw {code: "fail"}; }};
 document.body.classList.remove("no-dl");
 const ver = document.querySelector(".ver"); if (ver) ver.textContent = "Rotina PDPL v" + APP_VERSION;
 window.addEventListener("online", () => upd()); window.addEventListener("offline", () => upd());
