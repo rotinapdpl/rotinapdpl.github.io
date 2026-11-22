@@ -225,6 +225,12 @@ textarea{width:100%;min-height:90px;font-family:ui-monospace,Menlo,monospace;fon
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 input[data-pk="id"]{min-width:86px}
 table.ctr th,table.ctr td{text-align:center}
+.perchip{height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font:inherit;font-size:14px;padding:0 14px;cursor:pointer}
+.perchip:hover{border-color:var(--accent)}
+.rowlink{cursor:pointer}.rowlink:hover td{background:var(--surface-2)}
+.dt-soon{color:#b35c00;font-weight:600}.dt-late{color:#b3261e;font-weight:700}
+.est{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12.5px;font-weight:600;background:var(--surface-2);color:var(--ink2)}
+.est-prenhe{background:rgba(18,140,76,.14);color:#0d6b3a}.est-inseminada{background:rgba(31,155,181,.15);color:#13697b}.est-seca{background:rgba(124,92,196,.14);color:#5b3fa0}.est-prparto{background:rgba(235,104,52,.16);color:#a3441a}.est-descarte{background:rgba(179,38,30,.12);color:#8c1d17}
 </style>
 <meta name="theme-color" content="#0b2a4a">
 <link rel="manifest" href="manifest.webmanifest">
@@ -243,8 +249,10 @@ table.ctr th,table.ctr td{text-align:center}
       <button data-view="painel">Painel</button>
       <button data-view="sobre">Sobre a fazenda</button>
       <button data-view="animais">Cadastro de animais</button>
+      <button data-view="ocorrencias">Ocorrências</button>
       <button data-view="acoes">Ações e combinados</button>
       <div class="sep"></div>
+      <button data-view="periodos">Períodos</button>
       <button data-view="rotina">Rotina do mês</button>
       <button data-view="cria">Cria e Recria</button>
       <button data-view="qualidade">Qualidade do leite</button>
@@ -383,11 +391,11 @@ const CMTF = [["cmtVacas", "Vacas testadas", "vacas"], ["cmtPerd", "Tetos perdid
   ["cmt2", "Tetos com ++", "tetos"], ["cmt3", "Tetos com +++", "tetos"], ["preco", "Preço do leite", "R$/L"]];
 
 /* ============ estado e armazenamento ============ */
-const S = {livro: [], farms: {}, recs: {}, anims: {}, acoes: {}, farmId: null, ym: nowYm(), view: "painel", demo: false, loaded: false};
+const S = {livro: [], farms: {}, recs: {}, anims: {}, acoes: {}, ocor: {}, farmId: null, ym: nowYm(), view: "painel", demo: false, loaded: false};
 let col = null, downloads = null;
 const LS = "rotina-pdpl-v1";
 function lsLoad() { try { const j = JSON.parse(localStorage.getItem(LS) || "null"); if (j) { S.livro = j.livro || []; S.acoes = j.acoes || {}; S.farms = j.farms || {}; S.recs = j.recs || {}; S.anims = j.anims || {}; } } catch (e) {} }
-function lsSave() { try { localStorage.setItem(LS, JSON.stringify({farms: S.farms, recs: S.recs, anims: S.anims, acoes: S.acoes, livro: S.livro})); } catch (e) {} }
+function lsSave() { try { localStorage.setItem(LS, JSON.stringify({farms: S.farms, recs: S.recs, anims: S.anims, acoes: S.acoes, ocor: S.ocor, livro: S.livro})); } catch (e) {} }
 const recKey = (fid, ym) => fid + "|" + ym;
 const farms = () => S.demo ? DEMO.farms : S.farms;
 const recs = () => S.demo ? DEMO.recs : S.recs;
@@ -864,8 +872,7 @@ async function saveFile(filename, data) {
 function pageHead(title, withMonth = true, extra = "") {
   const f = farm();
   return `<div class="page-head"><div><h1>${esc(title)}</h1><div class="sub">${esc(farmLabel(f))}${f.nome && f.produtor ? " · " + esc(f.nome) : ""}${withMonth ? " — " + esc(ymLong(S.ym)) : ""}</div></div>
-    <div class="row-actions" style="margin:0">${extra}${withMonth ? `<div class="monthnav"><label for="monthSel">Mês</label><button class="icon-btn" data-mshift="-1" aria-label="Mês anterior">◀</button>
-    <input type="month" id="monthSel" value="${S.ym}" aria-label="Mês de referência"><button class="icon-btn" data-mshift="1" aria-label="Próximo mês">▶</button></div>` : ""}</div></div>
+    <div class="row-actions" style="margin:0">${extra}${withMonth ? `<button class="perchip" data-fx="goPer" title="Trocar o período">Período: <b>${esc(ymLong(S.ym))}</b> <span aria-hidden="true">▾</span></button>` : ""}</div></div>
     ${S.demo ? `<div class="banner"><p>Este é um <strong>produtor de exemplo</strong>, com dados fictícios. Cadastre um produtor seu para começar.</p><button class="btn primary" data-newfarm="1">Cadastrar produtor</button></div>` : ""}`;
 }
 
@@ -925,7 +932,7 @@ function otherTableHTML(c) {
 function renderPainel(el) {
   const r = rec(); const c = cm(S.ym); const prevYm = farmMonths().filter(m => m < S.ym).pop(); const p = prevYm ? cm(prevYm) : null; const M = metas();
   const pdfBtn = `<button class="btn primary" data-act="pdf">Gerar PDF do quadro</button>`;
-  if (!r) { el.innerHTML = pageHead("Painel") + `<div class="box"><h3>Nada lançado em ${esc(ymLong(S.ym))}</h3><p class="note" style="margin:0 0 10px">${farmMonths().length ? "Troque o mês no topo ou lance os dados deste mês." : "Este produtor ainda não tem lançamentos."}</p><button class="btn primary" data-go="rotina">Lançar rotina do mês</button></div>`; return; }
+  if (!r) { el.innerHTML = pageHead("Painel") + `<div class="box"><h3>Nada lançado em ${esc(ymLong(S.ym))}</h3><p class="note" style="margin:0 0 10px">${farmMonths().length ? "Este período ainda não foi criado. Escolha outro período ou crie este." : "Este produtor ainda não tem períodos. Crie o primeiro para começar."}</p><button class="btn primary" data-fx="goPer">Ir para Períodos</button></div>`; return; }
   const tp = talkingPoints(c, p, M); const T = theme(); const allDefs = [];
   const secs = PAINEL.map(sec => { const defs = defsFor(sec.ks, T); allDefs.push(...defs);
     return `<div class="sec-title" style="font-size:21px;border-bottom:2px solid var(--accent);padding-bottom:4px">${esc(sec.t)}</div>` +
@@ -933,6 +940,7 @@ function renderPainel(el) {
       `<div class="grid">${chartCards(defs)}</div>`; }).join("");
   el.innerHTML = pageHead("Painel", true, pdfBtn) + `<div class="sec-title" style="font-size:21px;border-bottom:2px solid var(--accent);padding-bottom:4px;margin-top:0">Resumo do mês</div>
     <div class="tiles">${TILES.map(k => tileHTML(k, c, p, M)).join("")}</div>
+    ${avisosHTML(animsOf(S.farmId))}
     ${(() => { const ab = acoesOf(S.farmId).filter(x => x.tipo === "visita" && !x.feito); return ab.length ? `<div class="talk" style="background:color-mix(in srgb,var(--brand) 10%,var(--surface))"><h3>Combinados para a próxima visita</h3><ul>${ab.map(x => `<li>${esc(x.texto)}${x.resp ? ` <span class="note">— ${esc(x.resp)}</span>` : ""}${x.prazo ? ` <span class="note">· até ${esc(brDate(x.prazo))}</span>` : ""}</li>`).join("")}</ul></div>` : ""; })()}
     <div class="talk"><h3>Pontos para conversar com o produtor</h3>${tp.length ? `<ul>${tp.map(x => `<li>${x}</li>`).join("")}</ul>` : `<p class="note" style="margin:0">Todos os indicadores com meta estão dentro do esperado neste mês.</p>`}</div>` + secs;
   mountCharts(allDefs);
@@ -1023,6 +1031,12 @@ async function makePDF(btn) {
         defs.slice(0, 4).forEach((d, i) => chartBlock(d, mg + (i % 2) * (cw + 8), top + Math.floor(i / 2) * rowH, cw, ih));
       }
     }
+    const av = avisos(animsOf(S.farmId));
+    if (av.length) { newPage("Avisos do rebanho"); let yy = 44; const cx = [mg, mg + 70, mg + 190, mg + 230];
+      const rowA = (cells, bold) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(bold ? 11 : 12); doc.setTextColor(bold ? 74 : 13, bold ? 83 : 21, bold ? 104 : 38); cells.forEach((t, i) => doc.text(pdfTxt(t), cx[i], yy)); doc.setDrawColor(223, 227, 234); doc.line(mg, yy + 2.6, W - mg, yy + 2.6); yy += 8.4; };
+      rowA(["Animal", "Aviso", "Data", "Quando"], true);
+      av.forEach(x => { if (yy > H - 16) { newPage("Avisos do rebanho (continuação)"); yy = 44; rowA(["Animal", "Aviso", "Data", "Quando"], true); } rowA([x.a.id + (x.a.nome ? " · " + x.a.nome : ""), x.tipo, brDate(x.data), quando(x.dias)]); });
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(124, 132, 151); doc.text(pdfTxt("Parto previsto = última inseminação + " + GEST + " dias. Secagem 60 dias e pré-parto 30 dias antes do parto."), mg, Math.min(yy + 4, H - 10)); }
     stage.innerHTML = "";
     await saveFile(safeName("Quadro de gestao - " + farmLabel(f) + " - " + S.ym) + ".pdf", doc.output("blob"));
   } catch (e) { console.error(e); toast("Não foi possível gerar o PDF."); }
@@ -1297,10 +1311,10 @@ function crHeadHTML() {
   const prev = prevSession(F, "cr"); const s = crStats(F, animList(), farm()) || {}; const P = farmParams(farm());
   return `<div class="fields">
     <div class="field"><label for="crData">Data de hoje (pesagem)</label><input type="date" id="crData" data-crtop="data" value="${esc(F.cr.data || "")}"></div>
-    <div class="field"><label for="crAnt">Data da última pesagem</label><input type="date" id="crAnt" data-crtop="dataAnt" value="${esc(F.cr.dataAnt || "")}" ${prev ? `placeholder="${isoDate(prev.date)}"` : ""}></div>
+    ${prev ? `<div class="field"><label>Data da pesagem anterior</label><input type="date" readonly value="${isoDate(prev.date)}" aria-label="Data da pesagem anterior"></div>` : `<div class="field"><label for="crAnt">Data da última pesagem</label><input type="date" id="crAnt" data-crtop="dataAnt" value="${esc(F.cr.dataAnt || "")}"></div>`}
     <div class="field"><label>Dias entre pesagens</label><div class="inwrap"><input type="text" readonly value="${isNum(s.dias) ? s.dias : ""}" aria-label="Dias entre pesagens"><span>dias</span></div></div>
     <div class="field"><label>Peso à puberdade <small>(${fmt(P.pc, 0)}% de ${fmt(P.pa, 0)} kg)</small></label><div class="inwrap"><input type="text" readonly value="${fmt(P.pp, 0)}" aria-label="Peso à puberdade"><span>kg</span></div></div></div>
-    <p class="note" style="margin:8px 0 0">${prev ? `Última pesagem no app: ${esc(brDate(isoDate(prev.date)))}. O peso anterior vem dela; deixe a data em branco para usar essa.` : "Primeira pesagem no app: lance o peso anterior e a data da última pesagem para calcular o GMD."} Peso adulto e % da puberdade se ajustam na aba Metas.</p>`;
+    <p class="note" style="margin:8px 0 0">${prev ? `A pesagem anterior (${esc(brDate(isoDate(prev.date)))}) vem do app: lance só a data e os pesos de hoje.` : "Primeira pesagem no app: lance o peso anterior e a data da última pesagem para calcular o GMD."} Peso adulto e % da puberdade se ajustam na aba Metas.</p>`;
 }
 function renderCria(el) {
   ensureForm();
@@ -1402,10 +1416,12 @@ function pesRowsHTML() {
       <td><button class="rm" data-prm="${i}" aria-label="Remover vaca">✕</button></td></tr>`; }).join("") || `<tr><td colspan="9" class="note">Carregue as vacas do cadastro ou adicione as vacas.</td></tr>`;
 }
 function renderControle(el) {
-  ensureForm(); const defs = defsFor("controle", theme()); const prev = prevSession(F, "pes");
+  ensureForm(); if (!F.dataPes && S.ym === nowYm()) F.dataPes = todayIso(); const defs = defsFor("controle", theme()); const prev = prevSession(F, "pes");
   el.innerHTML = pageHead("Controle Leiteiro") + `<datalist id="dlVacas">${animList().filter(a => a.cat === "vaca").map(a => `<option value="${esc(a.id)}">`).join("")}</datalist>
     <div class="form-wrap"><div class="box">
-      <div class="fields" style="margin-bottom:10px"><div class="field"><label for="dataPes">Data do controle</label><input type="date" id="dataPes" data-top="dataPes" value="${esc(F.dataPes || "")}"></div></div>
+      <div class="fields" style="margin-bottom:10px"><div class="field"><label for="dataPes">Data do controle de hoje</label><input type="date" id="dataPes" data-top="dataPes" value="${esc(F.dataPes || "")}"></div>
+        <div class="field"><label>Controle anterior</label><input type="text" readonly value="${prev ? esc(brDate(isoDate(prev.date))) + " (" + esc(ymLabel(prev.ym)) + ")" : "nenhum no app"}" aria-label="Data do controle anterior"></div>
+        ${prev && parseDate(F.dataPes) ? `<div class="field"><label>Dias desde o anterior</label><input type="text" readonly value="${dayDiff(parseDate(F.dataPes), prev.date)} dias" aria-label="Dias desde o controle anterior"></div>` : ""}</div>
       <div class="row-actions" style="margin:0 0 10px"><button class="btn sm" data-act="pesLoad">Carregar vacas do cadastro</button><button class="btn sm" data-act="pesAdd">+ Vaca</button><button class="btn sm" data-act="pasteOpen" data-target="pes">Colar da planilha</button>${F.pes.length ? `<button class="btn sm danger" data-act="pesClr">Limpar</button>` : ""}</div>
       <div class="tbl-wrap"><table><thead><tr><th>Vaca</th><th>Nome</th><th class="n">Litros no dia</th><th class="n">CCS (mil)</th><th class="n">DEL</th><th class="n">Perda pela CCS (kg/dia)</th><th class="n">${prev ? "Litros em " + esc(ymLabel(prev.ym)) : "Mês anterior"}</th><th class="n">Diferença</th><th></th></tr></thead><tbody id="pesBody">${pesRowsHTML()}</tbody></table></div>
       ${pasteBox("pes", "vaca; litros", "105\t22,4\n112\t18,0")}
@@ -1582,34 +1598,13 @@ async function impApply() {
 }
 
 /* ---- Cadastro de animais ---- */
-let animFilter = "todos";
-function animRowsHTML() {
-  const idx = A.map((a, i) => i).filter(i => animFilter === "todos" || A[i].cat === animFilter);
-  return idx.map(i => { const a = A[i]; return `<tr><td><input type="text" id="an_${i}" data-an="${i}" data-ak="id" value="${esc(a.id || "")}" aria-label="Brinco" style="min-width:70px"></td>
-    <td><input type="text" data-an="${i}" data-ak="nome" value="${esc(a.nome || "")}" aria-label="Nome"></td>
-    <td><select data-an="${i}" data-ak="cat" aria-label="Categoria">${Object.entries(CATS_ANIM).map(([k, v]) => `<option value="${k}"${a.cat === k ? " selected" : ""}>${v}</option>`).join("")}</select></td>
-    <td><input type="date" data-an="${i}" data-ak="nasc" value="${esc(a.nasc || "")}" aria-label="Nascimento" title="${a.nascEst ? "Estimada pelo brinco" : ""}" ${a.nascEst ? 'style="font-style:italic;color:var(--muted)"' : ""}></td>
-    <td><input type="text" class="num" inputmode="decimal" data-an="${i}" data-ak="pn" value="${numIn(a.pn)}" aria-label="Peso ao nascer"></td>
-    <td><input type="text" data-an="${i}" data-ak="lote" value="${esc(a.lote || "")}" aria-label="Lote"></td>
-    <td><input type="date" data-an="${i}" data-ak="parto" value="${esc(a.parto || "")}" aria-label="Último parto"></td>
-    <td><button class="rm" data-anrm="${i}" aria-label="Remover animal">✕</button></td></tr>`; }).join("") || `<tr><td colspan="8" class="note">Nenhum animal ${animFilter === "todos" ? "cadastrado" : "nesta categoria"}.</td></tr>`;
-}
-function renderAnimais(el) {
-  ensureForm(); const cnt = k => A.filter(a => a.cat === k).length;
-  el.innerHTML = pageHead("Cadastro de animais", false) + `<div class="box">
-    <div class="chips">${[["todos", "Todos (" + A.length + ")"], ...Object.entries(CATS_ANIM).map(([k, v]) => [k, v + " (" + cnt(k) + ")"])].map(([k, v]) => `<button class="fchip" data-afil="${k}" aria-pressed="${animFilter === k}">${esc(v)}</button>`).join("")}</div>
-    <div class="row-actions" style="margin:0 0 10px"><button class="btn sm" data-act="anAdd">+ Animal</button><button class="btn sm" data-act="pasteOpen" data-target="an">Colar da planilha</button><button class="btn sm" data-act="anCsv">Importar arquivo CSV</button></div>
-    ${pasteBox("an", "brinco; categoria (vaca, novilha, bezerra ou macho); nascimento; peso ao nascer; lote; último parto; nome", "503-A\tnovilha\t25/03/2025\t34\tR2\n111A\tvaca\t\t\t\t18/07/2026\tBrauna")}
-    <div class="tbl-wrap"><table><thead><tr><th>Brinco</th><th>Nome</th><th>Categoria</th><th>Nascimento</th><th class="n">Peso ao nascer (kg)</th><th>Lote</th><th>Último parto</th><th></th></tr></thead><tbody id="anBody">${animRowsHTML()}</tbody></table></div>
-    <p class="note" style="margin:8px 0 0">Se o brinco já existir, a importação atualiza os dados dele. Sem data de nascimento, ela é estimada pelo brinco (ex.: 301A = janeiro de 2023) e aparece em itálico.</p>
-    ${saveBar("Salvar cadastro")}</div>`;
-}
+let animFilter = "todos"; function animRowsHTML() { return ""; }
 function importAnimals(rows) {
   let novos = 0, atual = 0;
   rows.forEach(p => { const id = (p[0] || "").trim(); if (!id || /^brinco|^n[oº°]|^animal/i.test(id)) return;
     const catRaw = norm(p[1]); const cat = catRaw.startsWith("vac") ? "vaca" : catRaw.startsWith("nov") ? "novilha" : catRaw.startsWith("bez") && !catRaw.startsWith("bezerro") ? "bezerra" : catRaw.startsWith("mac") || catRaw.startsWith("bezerro") ? "macho" : null;
     let a = A.find(x => normId(x.id) === normId(id)); if (a) atual++; else { a = {id: normId(id), cat: cat || "bezerra", nasc: "", pn: null, lote: "", parto: ""}; A.push(a); novos++; }
-    if (cat) a.cat = cat; if (dtIn(p[2])) { a.nasc = dtIn(p[2]); a.nascEst = false; } if (isNum(toNum(p[3]))) a.pn = toNum(p[3]); if (p[4]) a.lote = p[4].trim(); if (dtIn(p[5])) a.parto = dtIn(p[5]); if (p[6]) a.nome = p[6].trim();
+    if (cat) a.cat = cat; if (dtIn(p[2])) { a.nasc = dtIn(p[2]); a.nascEst = false; } if (isNum(toNum(p[3]))) a.pn = toNum(p[3]); if (p[4]) a.lote = p[4].trim(); if (dtIn(p[5])) a.parto = dtIn(p[5]); if (p[6]) a.nome = p[6].trim(); if (dtIn(p[7])) a.ultIA = dtIn(p[7]); if (p[8]) { const e0 = norm(p[8]); const m0 = EST_VACA.concat(EST_NOV).find(x => norm(x) === e0); if (m0) a.estado = m0; } if (p[9]) a.mae = normId(p[9]);
     if (!a.nasc && nascFromBrinco(a.id)) { a.nasc = nascFromBrinco(a.id); a.nascEst = true; } });
   return {novos, atual};
 }
@@ -1874,7 +1869,7 @@ async function onAction(t) {
   if (act === "crLoad") { const have = new Set(F.cr.rows.map(x => x.id)); let k = 0; A.filter(a => a.cat === "bezerra" || a.cat === "novilha").forEach(a => { if (!have.has(a.id)) { F.cr.rows.push({id: a.id, peso: null, lote: ""}); k++; } }); markRec(); render(); toast(k ? k + " animais carregados. Lance o peso de hoje." : "Nenhum animal novo para carregar."); return; }
   if (act === "crAdd") { F.cr.rows.push({id: "", peso: null, lote: ""}); markRec(); $("#crBody").innerHTML = crRowsHTML(); $("#cr_" + (F.cr.rows.length - 1)).focus(); return; }
   if (act === "crClr") { if (await ask("Remover todos os animais da pesagem deste mês?", "Remover")) { F.cr.rows = []; markRec(); render(); } return; }
-  if (act === "pesLoad") { const have = new Set(F.pes.map(x => x.id)); let k = 0; A.filter(a => a.cat === "vaca").forEach(a => { if (!have.has(a.id)) { F.pes.push({id: a.id, l: null, ccs: null}); k++; } }); markRec(); render(); toast(k ? k + " vacas carregadas." : "Nenhuma vaca nova para carregar."); return; }
+  if (act === "pesLoad") { const have = new Set(F.pes.map(x => x.id)); let k = 0; A.filter(a => a.cat === "vaca" && repro(a).est !== "Seca" && norm(a.lote) !== "seca").forEach(a => { if (!have.has(a.id)) { F.pes.push({id: a.id, l: null, ccs: null}); k++; } }); markRec(); render(); toast(k ? k + " vacas carregadas." : "Nenhuma vaca nova para carregar."); return; }
   if (act === "pesAdd") { F.pes.push({id: "", l: null, ccs: null}); markRec(); refreshPes(); $("#pi_" + (F.pes.length - 1)).focus(); return; }
   if (act === "pesClr") { if (await ask("Remover todas as vacas do controle deste mês?", "Remover")) { F.pes = []; markRec(); render(); } return; }
   if (act === "anAdd") { animFilter = "todos"; A.push({id: "", cat: "bezerra", nasc: "", pn: null, lote: "", parto: ""}); markAnim(); render(); $("#an_" + (A.length - 1)).focus(); return; }
@@ -1887,7 +1882,8 @@ async function doSave() {
   if (guardDemo()) return false;
   let ok = true;
   if (dirtyAnim) { const list = A.filter(a => a.id).map(a => { const id = normId(a.id); const est = !a.nasc && nascFromBrinco(id);
-      return {id, nome: a.nome || "", cat: a.cat || "bezerra", nasc: a.nasc || est || "", nascEst: est ? true : !!a.nascEst, pn: isNum(a.pn) ? a.pn : null, lote: a.lote || "", parto: a.parto || "", lac: isNum(a.lac) ? a.lac : null}; });
+      const o = Object.assign({}, a, {id, nome: a.nome || "", cat: a.cat || "bezerra", nasc: a.nasc || est || "", nascEst: est ? true : !!a.nascEst, pn: isNum(a.pn) ? a.pn : null, lote: a.lote || "", parto: a.parto || "", lac: isNum(a.lac) ? a.lac : null});
+      Object.keys(o).forEach(k => { if (o[k] === undefined) delete o[k]; }); return o; });
     // o lote lançado na pesagem atualiza o cadastro
     if (F) F.cr.rows.forEach(r => { const a = list.find(x => x.id === normId(r.id)); if (a && r.lote) a.lote = r.lote; });
     ok = await saveAnims(S.farmId, list); if (ok) { A = clone(list); A._fid = S.farmId; dirtyAnim = false; } }
@@ -1930,7 +1926,7 @@ async function onAct2(t) {
   else if (a === "delFarm") { const f = farm();
     if (await ask(`Excluir ${farmLabel(f)}, os ${farmMonths().length} meses lançados e o cadastro de animais? Isso não pode ser desfeito.`, "Excluir")) {
       if (await deleteFarm(f.id)) { S.farmId = null; F = null; A = null; toast("Produtor excluído."); refreshSide(); render(); } } }
-  else if (a === "expJson") { await saveFile("rotina-pdpl-copia-" + nowYm() + ".json", JSON.stringify({app: "Rotina PDPL", versao: 3, exportado: new Date().toISOString(), farms: S.farms, recs: S.recs, anims: S.anims, acoes: S.acoes, livro: S.livro}, null, 1)); }
+  else if (a === "expJson") { await saveFile("rotina-pdpl-copia-" + nowYm() + ".json", JSON.stringify({app: "Rotina PDPL", versao: 3, exportado: new Date().toISOString(), farms: S.farms, recs: S.recs, anims: S.anims, acoes: S.acoes, ocor: S.ocor, livro: S.livro}, null, 1)); }
   else if (a === "impJson") $("#importFile").click();
 }
 async function importBackup(file) {
@@ -1942,12 +1938,13 @@ async function importBackup(file) {
   for (const r of Object.values(j.recs)) { if (!(await saveRec(r))) return; }
   for (const [fid, list] of Object.entries(j.anims || {})) { if (!(await saveAnims(fid, list))) return; }
   for (const [fid, list] of Object.entries(j.acoes || {})) { if (!(await saveAcoes(fid, list))) return; }
+  for (const [fid, list] of Object.entries(j.ocor || {})) { if (!(await saveOcor(fid, list))) return; }
   if (j.livro && j.livro.length) { const ids = new Set(S.livro.map(x => x.id)); await saveLivro(S.livro.concat(j.livro.filter(x => !ids.has(x.id)))); }
   toast("Cópia importada."); calcCache.clear(); refreshSide(); render();
 }
 
 /* ============ navegação ============ */
-const VIEWS = {acoes: renderAcoes, painel: renderPainel, rotina: renderRotina, alimentacao: renderAlim, cria: renderCria, qualidade: renderQual, controle: renderControle, animais: renderAnimais, metas: renderMetas, historico: renderHist};
+const VIEWS = {acoes: renderAcoes, painel: renderPainel, rotina: renderRotina, alimentacao: renderAlim, cria: renderCria, qualidade: renderQual, controle: renderControle, animais: renderAnimais, metas: renderMetas, historico: renderHist, periodos: renderPeriodos, ocorrencias: renderOcor};
 function refreshSide() {
   S.demo = S.loaded && Object.keys(S.farms).length === 0;
   const fs = farms(); if (S.farmId && !fs[S.farmId]) S.farmId = null;
@@ -1967,6 +1964,8 @@ function render() {
   if (S.view === "novo") { renderSobre(el, true); return; }
   if (!S.farmId) { el.innerHTML = `<div class="blank">${S.loaded ? "Selecione um produtor para ver o painel." : "Carregando…"}</div>`; return; }
   if (S.view === "sobre") { renderSobre(el, false); return; }
+  if (S.view !== "animais") fichaIdx = null;
+  if (MONTH_VIEWS.includes(S.view) && !rec() && !S.demo) { renderGate(el); return; }
   (VIEWS[S.view] || renderPainel)(el);
 }
 async function leaveOk() {
@@ -2056,6 +2055,342 @@ try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rere
 new MutationObserver(rerenderTheme).observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
 
 /* ============ início ============ */
+/* ============ Reprodução, cadastro em fichas, ocorrências e períodos ============ */
+const GEST = 283; // dias de gestação usados para o parto previsto
+const addDays = (iso, n) => { const d = parseDate(iso); if (!d) return ""; d.setDate(d.getDate() + n); return isoDate(d); };
+const daysTo = iso => { const d = parseDate(iso); if (!d) return null; return dayDiff(d, parseDate(todayIso())); };
+const EST_VACA = ["Vazia", "Inseminada", "Prenhe", "Seca", "Descarte"];
+const EST_NOV = ["Novilha", "Inseminada", "Prenhe", "Descarte"];
+const CAT_NOME = {vaca: "Vaca", novilha: "Novilha", bezerra: "Bezerra", macho: "Bezerro (macho)"};
+const idadeMeses = nasc => { const d = parseDate(nasc); return d ? dayDiff(parseDate(todayIso()), d) / MES : null; };
+function repro(a) {
+  let est = a.estado || (a.cat === "vaca" ? "Vazia" : a.cat === "novilha" ? "Novilha" : a.cat === "bezerra" ? "Bezerra" : "—");
+  const pren = ["Inseminada", "Prenhe", "Seca"].includes(est) && !!a.ultIA;
+  const partoPrev = pren ? addDays(a.ultIA, GEST) : "";
+  const secPrev = partoPrev && a.cat === "vaca" ? addDays(partoPrev, -60) : "";
+  const prePrev = partoPrev ? addDays(partoPrev, -30) : "";
+  const show = partoPrev && daysTo(prePrev) <= 0 ? "Pré-parto" : est;
+  return {est, show, partoPrev, secPrev, prePrev};
+}
+function lastWeights(fid) {
+  const m = {};
+  farmMonths(fid).forEach(ym => { const r = recs()[recKey(fid, ym)]; if (!r || !r.cr) return; const d = r.cr.data || isoDate(midMonth(ym));
+    (r.cr.rows || []).forEach(x => { if (isNum(x.peso)) m[normId(x.id)] = {peso: x.peso, data: d}; }); });
+  return m;
+}
+const quando = d => d < 0 ? `há ${-d} dia${d === -1 ? "" : "s"}` : d === 0 ? "hoje" : `em ${d} dia${d === 1 ? "" : "s"}`;
+// avisos de manejo: secagem, pré-parto, parto e confirmação de prenhez
+function avisos(list) {
+  const out = [];
+  list.forEach(a => { if (a.cat !== "vaca" && a.cat !== "novilha") return; const r = repro(a);
+    if (r.est === "Inseminada" && a.ultIA) { const d = daysTo(addDays(a.ultIA, 35)); if (d <= 7) out.push({a, tipo: "Confirmar prenhez (diagnóstico)", data: addDays(a.ultIA, 35), dias: d}); }
+    if (!r.partoPrev) return;
+    const dp = daysTo(r.partoPrev), dpp = daysTo(r.prePrev), ds = r.secPrev ? daysTo(r.secPrev) : null;
+    if (a.cat === "vaca" && r.est !== "Seca" && ds !== null && ds <= 15) out.push({a, tipo: ds < 0 ? "Secar (atrasada)" : "Secar", data: r.secPrev, dias: ds});
+    if (dpp <= 15 && dpp >= -7 && dp > 0) out.push({a, tipo: "Entrar no pré-parto", data: r.prePrev, dias: dpp});
+    if (dp <= 30) out.push({a, tipo: dp < -10 ? "Parto previsto já passou: lançar o parto ou corrigir" : "Parto previsto", data: r.partoPrev, dias: dp});
+  });
+  return out.sort((x, y) => x.dias - y.dias);
+}
+function avisosHTML(list) {
+  const av = avisos(list); if (!av.length) return "";
+  return `<div class="box"><h3>Avisos do rebanho</h3><div class="tbl-wrap"><table><thead><tr><th>Animal</th><th>Aviso</th><th>Data</th><th>Quando</th></tr></thead><tbody>
+    ${av.map(x => `<tr><td><b>${esc(x.a.id)}</b>${x.a.nome ? " · " + esc(x.a.nome) : ""}</td><td>${esc(x.tipo)}</td><td>${brDate(x.data)}</td><td class="${x.dias < 0 ? "dt-late" : x.dias <= 15 ? "dt-soon" : ""}">${quando(x.dias)}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note" style="margin:8px 0 0">Parto previsto = última inseminação + ${GEST} dias. Secagem 60 dias e pré-parto 30 dias antes do parto.</p></div>`;
+}
+
+/* ---- Cadastro de animais (lista + ficha) ---- */
+let fichaIdx = null, anBusca = "";
+const dcls = iso => { const d = daysTo(iso); return d === null ? "" : d < 0 ? "dt-late" : d <= 15 ? "dt-soon" : ""; };
+const dcell = iso => iso ? `<span class="${dcls(iso)}">${brDate(iso)}</span>` : "—";
+function anTablesHTML() {
+  const Wt = lastWeights(S.farmId); const q = norm(anBusca);
+  const match = a => !q || norm(a.id).includes(q) || norm(a.nome).includes(q);
+  const vac = A.map((a, i) => ({a, i})).filter(x => x.a.cat === "vaca" && match(x.a)).sort((x, y) => String(x.a.id).localeCompare(String(y.a.id), "pt", {numeric: true}));
+  const jov = A.map((a, i) => ({a, i})).filter(x => x.a.cat !== "vaca" && match(x.a)).sort((x, y) => (y.a.nasc || "").localeCompare(x.a.nasc || ""));
+  const hoje = parseDate(todayIso());
+  const vRows = vac.map(({a, i}) => { const r = repro(a); const del = a.parto && r.est !== "Seca" ? dayDiff(hoje, parseDate(a.parto)) : null;
+    return `<tr class="rowlink" data-fi="${i}"><td><b>${esc(a.id || "(sem brinco)")}</b></td><td>${esc(a.nome || "")}</td><td class="n">${isNum(a.lac) ? a.lac : "—"}</td><td>${a.parto ? brDate(a.parto) : "—"}</td><td class="n">${isNum(del) && del >= 0 ? del : "—"}</td>
+      <td>${a.ultIA ? brDate(a.ultIA) : "—"}</td><td><span class="est est-${norm(r.show).replace(/[^a-z]/g, "")}">${esc(r.show)}</span></td><td>${dcell(r.partoPrev)}</td><td>${r.est === "Seca" ? `<span class="note">seca${a.secagem ? " em " + brDate(a.secagem) : ""}</span>` : dcell(r.secPrev)}</td><td>${dcell(r.prePrev)}</td></tr>`; }).join("");
+  const jRows = jov.map(({a, i}) => { const r = repro(a); const w = Wt[normId(a.id)]; const id = idadeMeses(a.nasc);
+    return `<tr class="rowlink" data-fi="${i}"><td><b>${esc(a.id || "(sem brinco)")}</b></td><td>${esc(a.nome || "")}</td><td>${esc(CAT_NOME[a.cat] || a.cat)}</td><td>${a.nasc ? `<span ${a.nascEst ? 'class="note" title="Estimada pelo brinco"' : ""}>${brDate(a.nasc)}</span>` : "—"}</td><td class="n">${isNum(id) ? fmt(id, 1) : "—"}</td>
+      <td>${a.cat === "novilha" ? `<span class="est est-${norm(r.show).replace(/[^a-z]/g, "")}">${esc(r.show)}</span>` : "—"}</td><td>${esc(a.mae || "—")}</td><td class="n">${w ? fmt(w.peso, 0) : "—"}</td><td>${w ? brDate(w.data) : "—"}</td><td>${esc(a.lote || "—")}</td><td>${dcell(r.partoPrev)}</td></tr>`; }).join("");
+  return `<div class="box"><h3>Vacas <span class="note" style="font-weight:400">· ${vac.length}</span></h3><div class="tbl-wrap"><table><thead><tr><th>Brinco</th><th>Nome</th><th class="n">Lac.</th><th>Último parto</th><th class="n">DEL</th><th>Última inseminação</th><th>Estado</th><th>Parto previsto</th><th>Secagem prevista</th><th>Entrada no pré-parto</th></tr></thead>
+    <tbody>${vRows || `<tr><td colspan="10" class="note">Nenhuma vaca${q ? " encontrada" : " cadastrada"}.</td></tr>`}</tbody></table></div></div>
+    <div class="box"><h3>Novilhas e bezerras <span class="note" style="font-weight:400">· ${jov.length}</span></h3><div class="tbl-wrap"><table><thead><tr><th>Brinco</th><th>Nome</th><th>Categoria</th><th>Nascimento</th><th class="n">Idade (meses)</th><th>Estado</th><th>Mãe</th><th class="n">Peso (kg)</th><th>Última pesagem</th><th>Lote</th><th>Parto previsto</th></tr></thead>
+    <tbody>${jRows || `<tr><td colspan="11" class="note">Nenhuma novilha ou bezerra${q ? " encontrada" : " cadastrada"}.</td></tr>`}</tbody></table></div></div>`;
+}
+function renderAnimais(el) {
+  ensureForm();
+  if (fichaIdx != null && A[fichaIdx]) { renderFicha(el, fichaIdx); return; } fichaIdx = null;
+  el.innerHTML = pageHead("Cadastro de animais", false, `<button class="btn" data-fx="pdfCad">Baixar cadastro (PDF)</button>`) + `
+    <div class="box"><div class="row-actions" style="margin:0"><input type="search" id="anBusca" placeholder="Buscar brinco ou nome" value="${esc(anBusca)}" style="height:38px;min-width:220px;margin-right:auto" aria-label="Buscar animal">
+      <button class="btn sm primary" data-fx="newVaca">+ Vaca</button><button class="btn sm primary" data-fx="newJovem">+ Novilha ou bezerra</button><button class="btn sm" data-act="pasteOpen" data-target="an">Colar da planilha</button><button class="btn sm" data-act="anCsv">Importar arquivo CSV</button></div>
+      ${pasteBox("an", "brinco; categoria (vaca, novilha, bezerra ou macho); nascimento; peso ao nascer; lote; último parto; nome; última inseminação; estado; mãe", "503-A\tnovilha\t25/03/2025\t34\tR2\n111A\tvaca\t\t\t\t18/07/2026\tBrauna\t02/10/2026\tInseminada")}
+      <p class="note" style="margin:8px 0 0">Clique num animal para abrir a ficha. As ocorrências (inseminação, parto, secagem…) atualizam as fichas sozinhas. Datas em <span class="dt-soon">laranja</span> vencem em até 15 dias; em <span class="dt-late">vermelho</span>, já passaram.</p>
+      ${isDirty() ? saveBar("Salvar cadastro importado") : ""}</div>
+    ${avisosHTML(A)}<div id="anTabs">${anTablesHTML()}</div>`;
+}
+function fichaHist(a) {
+  const id = normId(a.id); const oc = ocorOf(S.farmId).filter(o => normId(o.animal) === id || normId(o.cria) === id).sort((x, y) => (y.data || "").localeCompare(x.data || ""));
+  const pes = [], lei = [];
+  farmMonths().forEach(ym => { const r = recs()[recKey(S.farmId, ym)]; if (!r) return;
+    const c = (r.cr && r.cr.rows || []).find(x => normId(x.id) === id && isNum(x.peso)); if (c) pes.push({data: r.cr.data || isoDate(midMonth(ym)), peso: c.peso, lote: c.lote});
+    const p = (r.pes || []).find(x => normId(x.id) === id && (isNum(x.l) || isNum(x.ccs))); if (p) lei.push({data: r.dataPes || isoDate(midMonth(ym)), l: p.l, ccs: p.ccs}); });
+  return {oc, pes: pes.reverse(), lei: lei.reverse()};
+}
+function ocDesc(o) {
+  const p = [];
+  if (o.tipo === "ia") { if (o.tipoIA) p.push(o.tipoIA); if (o.touro) p.push("touro/sêmen: " + o.touro); if (o.insem) p.push("por " + o.insem); }
+  if (o.tipo === "diag") p.push(o.res || "");
+  if (o.tipo === "parto") p.push(o.sexo === "Natimorto" ? "natimorto" : `cria ${o.sexo ? o.sexo.toLowerCase() : ""}${o.cria ? " " + o.cria : ""}${isNum(o.pn) ? ", " + fmt(o.pn, 1) + " kg" : ""}`);
+  if (o.tipo === "mast") { if (o.quartos) p.push("quartos: " + o.quartos); if (o.grau) p.push(o.grau.toLowerCase()); if (o.trat) p.push("tratamento: " + o.trat); }
+  if (o.tipo === "compra") { p.push(CAT_NOME[o.cat] || ""); if (o.origem) p.push("de " + o.origem); if (isNum(o.valor)) p.push(fmtR(o.valor)); }
+  if (o.tipo === "venda") { if (o.motivo) p.push(o.motivo); if (o.dest) p.push("para " + o.dest); if (isNum(o.valor)) p.push(fmtR(o.valor)); }
+  if (o.tipo === "morte" && o.causa) p.push(o.causa);
+  if (o.obs) p.push(o.obs);
+  return p.filter(Boolean).join(" · ");
+}
+const fmtR = v => "R$ " + fmt(v, 2);
+function renderFicha(el, i) {
+  const a = A[i]; const r = repro(a); const w = lastWeights(S.farmId)[normId(a.id)]; const isV = a.cat === "vaca", isN = a.cat === "novilha";
+  const est = isV ? EST_VACA : isN ? EST_NOV : [];
+  const fi = (k, label, type = "text", extra = "") => `<div class="field"><label for="fk_${k}">${label}</label><input type="${type}" id="fk_${k}" data-fk="${k}" value="${esc(a[k] == null ? "" : a[k])}" ${type === "text" && /pn|lac/.test(k) ? 'inputmode="decimal"' : ""} ${extra} autocomplete="off"></div>`;
+  const ro = (label, v) => `<div class="field"><label>${label}</label><input type="text" readonly value="${esc(v)}" aria-label="${esc(label)}"></div>`;
+  const id = idadeMeses(a.nasc); const del = isV && a.parto && r.est !== "Seca" ? dayDiff(parseDate(todayIso()), parseDate(a.parto)) : null;
+  const h = fichaHist(a);
+  el.innerHTML = `<div class="page-head"><div><h1>Ficha · ${esc(a.id || "novo animal")}${a.nome ? " · " + esc(a.nome) : ""}</h1><div class="sub">${esc(farmLabel(farm()))} — ${esc(CAT_NOME[a.cat] || "")}</div></div>
+    <div class="row-actions" style="margin:0"><button class="btn" data-fx="back">← Voltar ao cadastro</button>${a.id ? `<button class="btn" data-fx="pdfFicha">Baixar ficha (PDF)</button><button class="btn" data-fx="ocFor">Lançar ocorrência</button>` : ""}</div></div>
+    <div class="box"><h3>Identificação</h3><div class="fields">
+      ${fi("id", "Brinco")}${fi("nome", "Nome")}
+      <div class="field"><label for="fk_cat">Categoria</label><select id="fk_cat" data-fk="cat">${Object.entries(CAT_NOME).map(([k, v]) => `<option value="${k}"${a.cat === k ? " selected" : ""}>${v}</option>`).join("")}</select></div>
+      ${fi("nasc", "Data de nascimento", "date")}${fi("pn", "Peso ao nascer (kg)")}${fi("mae", "Mãe (brinco)")}${fi("lote", "Lote")}</div></div>
+    ${isV || isN ? `<div class="box"><h3>Reprodução</h3><div class="fields">
+      ${isV ? fi("lac", "Nº de lactações") + fi("parto", "Data do último parto", "date") : ""}${fi("ultIA", "Última inseminação", "date")}${fi("touro", "Touro ou sêmen")}
+      <div class="field"><label for="fk_estado">Estado reprodutivo</label><select id="fk_estado" data-fk="estado">${est.map(s => `<option${r.est === s ? " selected" : ""}>${s}</option>`).join("")}</select></div>
+      ${isV ? ro("DEL (dias em lactação)", isNum(del) && del >= 0 ? del : "—") : ""}${ro("Parto previsto", r.partoPrev ? brDate(r.partoPrev) : "—")}${isV ? ro("Secagem prevista (60 dias antes)", r.secPrev ? brDate(r.secPrev) : "—") : ""}${ro("Entrada no pré-parto (30 dias antes)", r.prePrev ? brDate(r.prePrev) : "—")}</div>
+      <p class="note" style="margin:8px 0 0">O parto previsto conta ${GEST} dias a partir da última inseminação, quando o estado é Inseminada, Prenhe ou Seca.</p></div>` : ""}
+    <div class="box"><h3>Desenvolvimento</h3><div class="fields">${ro("Idade", isNum(id) ? fmt(id, 1) + " meses" : "—")}${ro("Último peso", w ? fmt(w.peso, 0) + " kg em " + brDate(w.data) : "—")}</div></div>
+    <div class="row-actions"><button class="btn primary" data-fx="saveFicha">Salvar ficha</button><button class="btn danger" data-fx="delAn">Excluir do cadastro</button></div>
+    <div class="box" style="margin-top:18px"><h3>Histórico de ocorrências</h3>${h.oc.length ? `<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Ocorrência</th><th>Detalhes</th></tr></thead><tbody>${h.oc.map(o => `<tr><td>${brDate(o.data)}</td><td>${normId(o.cria) === normId(a.id) ? "Nascimento" : esc(OC_TIPOS[o.tipo] || o.tipo)}</td><td class="note">${esc(normId(o.cria) === normId(a.id) ? "filha de " + (o.animal || "") : ocDesc(o))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="note" style="margin:0">Nenhuma ocorrência lançada para este animal.</p>`}</div>
+    ${h.pes.length ? `<div class="box"><h3>Pesagens</h3><div class="tbl-wrap"><table><thead><tr><th>Data</th><th class="n">Peso (kg)</th><th>Lote</th></tr></thead><tbody>${h.pes.map(x => `<tr><td>${brDate(x.data)}</td><td class="n">${fmt(x.peso, 0)}</td><td>${esc(x.lote || "")}</td></tr>`).join("")}</tbody></table></div></div>` : ""}
+    ${h.lei.length ? `<div class="box"><h3>Controle leiteiro e CCS</h3><div class="tbl-wrap"><table><thead><tr><th>Data</th><th class="n">Litros no dia</th><th class="n">CCS (mil)</th></tr></thead><tbody>${h.lei.map(x => `<tr><td>${brDate(x.data)}</td><td class="n">${isNum(x.l) ? fmt(x.l, 1) : "—"}</td><td class="n ${isNum(x.ccs) && x.ccs > 200 ? "up-bad" : ""}">${isNum(x.ccs) ? fmt(x.ccs, 0) : "—"}</td></tr>`).join("")}</tbody></table></div></div>` : ""}`;
+}
+
+/* ---- Ocorrências ---- */
+const OC_TIPOS = {ia: "Inseminação", diag: "Diagnóstico de gestação", parto: "Parto", seca: "Secagem", mast: "Mastite", compra: "Compra", venda: "Venda", morte: "Morte"};
+const MOTIVOS = ["Descarte reprodutivo", "Mastite ou CCS alta", "Baixa produção", "Problema de casco", "Idade", "Bezerro macho", "Venda de novilha", "Outro"];
+const ocorOf = fid => (S.ocor && S.ocor[fid]) || [];
+async function saveOcor(fid, list) { if (guardDemo()) return false; S.ocor[fid] = list; try { await writeDoc("ocor_" + fid, {farmId: fid, list}); return true; } catch (e) { return failed(e); } }
+let ocTipo = "ia", ocFil = "todas", ocPre = "";
+function renderOcor(el) {
+  ensureForm();
+  const t = ocTipo, al = animList();
+  const elig = t === "seca" || t === "mast" ? a => a.cat === "vaca" : ["ia", "diag", "parto"].includes(t) ? a => a.cat === "vaca" || a.cat === "novilha" : () => true;
+  const f = (id, label, input) => `<div class="field"><label for="${id}">${label}</label>${input}</div>`;
+  const inp = (id, ph = "") => `<input type="text" id="${id}" ${ph ? `placeholder="${esc(ph)}"` : ""} autocomplete="off">`;
+  const sel = (id, opts) => `<select id="${id}">${opts.map(o => `<option>${esc(o)}</option>`).join("")}</select>`;
+  const kg = id => `<div class="inwrap"><input type="text" id="${id}" inputmode="decimal" autocomplete="off"><span>kg</span></div>`;
+  let fl = f("oc_data", "Data", `<input type="date" id="oc_data" value="${todayIso()}">`);
+  if (t !== "compra") fl += f("oc_an", t === "parto" ? "Mãe (brinco)" : "Animal (brinco)", `<input type="text" id="oc_an" list="dlOc" value="${esc(ocPre)}" autocomplete="off">`);
+  if (t === "ia") fl += f("oc_tipoia", "Tipo", sel("oc_tipoia", ["IA", "IATF", "Monta natural"])) + f("oc_touro", "Touro ou sêmen", inp("oc_touro")) + f("oc_insem", "Inseminador", inp("oc_insem"));
+  if (t === "diag") fl += f("oc_res", "Resultado", sel("oc_res", ["Prenhe", "Vazia"]));
+  if (t === "parto") fl += `</div><h3 style="margin:16px 0 8px;font-size:15px">Cria</h3><div class="fields">` + f("oc_sexo", "Sexo", sel("oc_sexo", ["Fêmea", "Macho", "Natimorto"])) + f("oc_cbr", "Brinco da cria", inp("oc_cbr")) + f("oc_cpn", "Peso ao nascer", kg("oc_cpn")) + f("oc_cnome", "Nome (opcional)", inp("oc_cnome"));
+  if (t === "mast") fl += f("oc_q", "Quartos afetados", `<div style="display:flex;gap:12px;height:42px;align-items:center">${["AD", "AE", "PD", "PE"].map(q => `<label class="check" style="margin:0"><input type="checkbox" data-q="${q}"> ${q}</label>`).join("")}</div>`) + f("oc_grau", "Grau", sel("oc_grau", ["Leve (só o leite alterado)", "Moderada (úbere alterado)", "Grave (vaca doente)"])) + f("oc_trat", "Tratamento", inp("oc_trat", "produto e dias"));
+  if (t === "compra") fl += f("oc_cbr", "Brinco", inp("oc_cbr")) + f("oc_cnome", "Nome", inp("oc_cnome")) + f("oc_ccat", "Categoria", `<select id="oc_ccat">${Object.entries(CAT_NOME).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>`) + f("oc_cnasc", "Nascimento", `<input type="date" id="oc_cnasc">`) + f("oc_cparto", "Último parto (se vaca)", `<input type="date" id="oc_cparto">`) + f("oc_valor", "Valor (R$)", inp("oc_valor")) + f("oc_origem", "Origem", inp("oc_origem"));
+  if (t === "venda") fl += f("oc_motivo", "Motivo", sel("oc_motivo", MOTIVOS)) + f("oc_valor", "Valor (R$)", inp("oc_valor")) + f("oc_dest", "Comprador", inp("oc_dest"));
+  if (t === "morte") fl += f("oc_causa", "Causa", inp("oc_causa"));
+  fl += f("oc_obs", "Observação", inp("oc_obs"));
+  const L = ocorOf(S.farmId).slice().sort((x, y) => (y.data || "").localeCompare(x.data || "") || (y.criadoEm || "").localeCompare(x.criadoEm || ""));
+  const Lf = L.filter(x => ocFil === "todas" || x.tipo === ocFil);
+  const doMes = L.filter(x => (x.data || "").startsWith(S.ym)); const cnt = {}; doMes.forEach(x => cnt[x.tipo] = (cnt[x.tipo] || 0) + 1);
+  el.innerHTML = pageHead("Ocorrências", false) + `<datalist id="dlOc">${al.filter(elig).map(a => `<option value="${esc(a.id)}">${esc(a.nome || CAT_NOME[a.cat] || "")}</option>`).join("")}</datalist>
+    <div class="box"><h3>Lançar ocorrência</h3><div class="chips" style="margin-bottom:12px">${Object.entries(OC_TIPOS).map(([k, v]) => `<button class="fchip" data-octipo="${k}" aria-pressed="${t === k}">${esc(v)}</button>`).join("")}</div>
+      <div class="fields" id="ocForm">${fl}</div>
+      <p class="note" style="margin:10px 0 0">${{ia: "Atualiza a última inseminação, o touro e o estado (Inseminada) na ficha, e calcula o parto previsto.", diag: "Prenhe confirma a gestação; Vazia volta o animal para Vazia (vaca) ou Novilha.", parto: "A novilha vira vaca, a lactação e o último parto se atualizam e a cria entra no cadastro com o brinco informado.", seca: "A vaca passa para Seca.", mast: "Fica no histórico da vaca e na contagem de casos do mês.", compra: "O animal entra no cadastro.", venda: "O animal sai do cadastro e fica registrado no histórico.", morte: "O animal sai do cadastro e fica registrado no histórico."}[t]}</p>
+      <div class="row-actions"><button class="btn primary" data-fx="ocAdd">Lançar ${esc(OC_TIPOS[t].toLowerCase())}</button></div></div>
+    <div class="box"><h3>Registro de ocorrências</h3>
+      ${doMes.length ? `<p class="note" style="margin:-4px 0 10px">Em ${esc(ymLong(S.ym))}: ${Object.entries(cnt).map(([k, n]) => `${n} ${esc(OC_TIPOS[k].toLowerCase())}`).join(" · ")}</p>` : ""}
+      <div class="chips" style="margin-bottom:10px">${[["todas", "Todas"], ...Object.entries(OC_TIPOS)].map(([k, v]) => `<button class="fchip" data-ocfil="${k}" aria-pressed="${ocFil === k}">${esc(v)}</button>`).join("")}</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Ocorrência</th><th>Animal</th><th>Detalhes</th><th></th></tr></thead><tbody>
+      ${Lf.map(o => `<tr><td>${brDate(o.data)}</td><td>${esc(OC_TIPOS[o.tipo] || o.tipo)}</td><td><b>${esc(o.animal || "")}</b>${o.nome ? " · " + esc(o.nome) : ""}</td><td class="note">${esc(ocDesc(o))}</td><td><button class="rm" data-ocrm="${o.id}" aria-label="Apagar registro">✕</button></td></tr>`).join("") || `<tr><td colspan="5" class="note">Nenhuma ocorrência lançada.</td></tr>`}
+      </tbody></table></div></div>`;
+}
+async function addOcor() {
+  if (guardDemo()) return;
+  const v = id => { const e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  const t = ocTipo, data = v("oc_data"); if (!data) { toast("Coloque a data."); return; }
+  const o = {id: uid(), tipo: t, data, obs: v("oc_obs"), criadoEm: new Date().toISOString()};
+  let a = null;
+  if (t !== "compra") {
+    const id = normId(v("oc_an")); a = A.find(x => normId(x.id) === id);
+    if (!id) { toast("Digite o brinco do animal."); return; }
+    if (!a) { toast("O brinco " + id + " não está no cadastro."); return; }
+    if (["ia", "diag", "parto"].includes(t) && a.cat !== "vaca" && a.cat !== "novilha") { toast("Esta ocorrência é só para vacas e novilhas."); return; }
+    if ((t === "seca" || t === "mast") && a.cat !== "vaca") { toast("Esta ocorrência é só para vacas."); return; }
+    o.animal = a.id; if (a.nome) o.nome = a.nome;
+  }
+  if ((t === "venda" || t === "morte") && !(await ask(`Registrar a ${t === "venda" ? "venda" : "morte"} de ${a.id}${a.nome ? " (" + a.nome + ")" : ""}? O animal sai do cadastro e fica no histórico de ocorrências.`, "Registrar"))) return;
+  const bak = clone(A);
+  if (t === "ia") { o.tipoIA = v("oc_tipoia"); o.touro = v("oc_touro"); o.insem = v("oc_insem"); a.ultIA = data; a.touro = o.touro; a.estado = "Inseminada"; }
+  if (t === "diag") { o.res = v("oc_res"); a.estado = o.res === "Prenhe" ? "Prenhe" : a.cat === "vaca" ? "Vazia" : "Novilha"; }
+  if (t === "parto") {
+    const sexo = v("oc_sexo"), cb = normId(v("oc_cbr")); o.sexo = sexo; o.pn = toNum(v("oc_cpn")); o.cnome = v("oc_cnome");
+    if (cb && sexo !== "Natimorto") { if (A.some(x => normId(x.id) === cb)) { toast("Já existe um animal com o brinco " + cb + "."); return; } o.cria = cb; }
+    if (a.cat !== "vaca") { a.cat = "vaca"; a.lac = 1; } else a.lac = (isNum(a.lac) ? a.lac : 0) + 1;
+    a.parto = data; a.estado = "Vazia"; a.ultIA = ""; a.touro = ""; a.secagem = "";
+    if (o.cria) A.push({id: cb, nome: o.cnome || "", cat: sexo === "Macho" ? "macho" : "bezerra", nasc: data, nascEst: false, pn: isNum(o.pn) ? o.pn : null, lote: "", parto: "", lac: null, mae: a.id});
+  }
+  if (t === "seca") { a.estado = "Seca"; a.secagem = data; }
+  if (t === "mast") { o.quartos = [...document.querySelectorAll("#ocForm [data-q]:checked")].map(x => x.dataset.q).join(", "); o.grau = v("oc_grau").split(" (")[0]; o.trat = v("oc_trat"); a.ultMastite = data; }
+  if (t === "compra") {
+    const cb = normId(v("oc_cbr")); if (!cb) { toast("Coloque o brinco do animal comprado."); return; }
+    if (A.some(x => normId(x.id) === cb)) { toast("Já existe um animal com o brinco " + cb + "."); return; }
+    const cat = v("oc_ccat") || "vaca"; const nasc = v("oc_cnasc"); o.animal = cb; o.nome = v("oc_cnome"); o.cat = cat; o.valor = toNum(v("oc_valor")); o.origem = v("oc_origem");
+    A.push({id: cb, nome: o.nome, cat, nasc: nasc || nascFromBrinco(cb) || "", nascEst: !nasc && !!nascFromBrinco(cb), pn: null, lote: "", parto: cat === "vaca" ? v("oc_cparto") : "", lac: cat === "vaca" ? null : null});
+  }
+  if (t === "venda" || t === "morte") { o.motivo = v("oc_motivo"); o.valor = toNum(v("oc_valor")); o.dest = v("oc_dest"); o.causa = v("oc_causa"); o.ani = clone(a); A.splice(A.indexOf(a), 1); }
+  Object.keys(o).forEach(k => { if (o[k] === "" || o[k] == null) delete o[k]; });
+  dirtyAnim = true;
+  const ok = await doSave(); if (!ok) { A = bak; A._fid = S.farmId; return; }
+  if (await saveOcor(S.farmId, ocorOf(S.farmId).concat([o]))) { toast(OC_TIPOS[t] + " lançad" + (["ia", "diag", "seca", "mast", "compra", "venda", "morte"].includes(t) ? "a" : "o") + "."); ocPre = ""; render(); }
+}
+
+/* ---- Períodos ---- */
+const MONTH_VIEWS = ["rotina", "cria", "qualidade", "alimentacao", "controle"];
+function renderPeriodos(el) {
+  const ms = farmMonths().slice().reverse(); const last = farmMonths().slice(-1)[0];
+  const sug = !last ? nowYm() : (last < nowYm() ? nowYm() : ymShift(last, 1));
+  el.innerHTML = `<div class="page-head"><div><h1>Períodos</h1><div class="sub">${esc(farmLabel(farm()))}</div></div></div>
+    <div class="box"><h3>Criar período</h3><p class="note" style="margin:-4px 0 12px">Crie o mês da visita para liberar os lançamentos da Rotina do mês, Cria e Recria, Qualidade do leite, Alimentação e Controle Leiteiro. As dietas do mês anterior já vêm copiadas.</p>
+      <div class="fields" style="max-width:420px"><div class="field"><label for="perNovo">Mês</label><input type="month" id="perNovo" value="${sug}"></div></div>
+      <div class="row-actions"><button class="btn primary" data-fx="perCriar">Criar período</button></div></div>
+    <div class="box"><h3>Períodos criados</h3><div class="tbl-wrap"><table><thead><tr><th>Período</th><th class="n">Leite (L/dia)</th><th class="n">Vacas em lactação</th><th class="n">Bezerras pesadas</th><th class="n">Vacas no controle</th><th></th></tr></thead><tbody>
+      ${ms.map(ym => { const r = recs()[recKey(S.farmId, ym)] || {}; const c = cm(ym) || {}; const cur = ym === S.ym;
+        return `<tr${cur ? ' style="background:color-mix(in srgb,var(--brand) 9%,transparent)"' : ""}><td><b>${esc(ymLong(ym))}</b>${cur ? ' <span class="note">· em uso</span>' : ""}</td><td class="n">${isNum(c.leiteDia) ? fmt(c.leiteDia, 0) : "—"}</td><td class="n">${isNum(c.vl) ? fmt(c.vl, 0) : "—"}</td>
+          <td class="n">${((r.cr && r.cr.rows) || []).filter(x => isNum(x.peso)).length || "—"}</td><td class="n">${(r.pes || []).filter(x => isNum(x.l)).length || "—"}</td>
+          <td style="white-space:nowrap">${cur ? "" : `<button class="btn sm primary" data-perym="${ym}">Usar este período</button>`} <button class="btn sm danger" data-perdel="${ym}">Excluir</button></td></tr>`; }).join("") || `<tr><td colspan="6" class="note">Nenhum período criado ainda.</td></tr>`}
+    </tbody></table></div></div>`;
+}
+async function criarPeriodo(ym) {
+  if (guardDemo()) return;
+  if (!/^\d{4}-\d{2}$/.test(ym || "")) { toast("Escolha o mês."); return; }
+  if (rec(ym)) { toast(ymLong(ym) + " já existe."); return; }
+  if (!(await leaveOk())) return;
+  const r = {farmId: S.farmId, ym, d: {}, pes: [], dataPes: "", cr: {data: "", dataAnt: "", rows: []}};
+  const pv = farmMonths().filter(m => m < ym).reverse().map(m => rec(m)).find(x => x && lotesOf(x).lotes.length);
+  const lo = pv ? lotesOf(pv) : {lotes: [], ingr: [], mix: []}; r.lotes = clone(lo.lotes); r.ingr = clone(lo.ingr); r.mix = clone(lo.mix || []);
+  if (await saveRec(r)) { S.ym = ym; F = null; toast("Período " + ymLong(ym) + " criado."); S.view = "rotina"; refreshSide(); render(); }
+}
+function renderGate(el) {
+  const titles = {rotina: "Rotina do mês", cria: "Cria e Recria", qualidade: "Qualidade do leite", alimentacao: "Alimentação", controle: "Controle Leiteiro"};
+  el.innerHTML = pageHead(titles[S.view] || "") + `<div class="box"><h3>O período ${esc(ymLong(S.ym))} ainda não foi criado</h3><p class="note" style="margin:0 0 12px">Crie o período para liberar os lançamentos deste mês, ou escolha outro período.</p>
+    <div class="row-actions" style="margin:0"><button class="btn primary" data-fx="perCriarCur">Criar ${esc(ymLong(S.ym))}</button><button class="btn" data-fx="goPer">Ver períodos</button></div></div>`;
+}
+
+/* ---- PDFs do cadastro e da ficha ---- */
+function pdfKit(orient, titulo, subtitulo) {
+  const {jsPDF} = window.jspdf; const doc = new jsPDF({orientation: orient, unit: "mm", format: "a4"});
+  const W = orient === "landscape" ? 297 : 210, H = orient === "landscape" ? 210 : 297, mg = 12, tw = W - 2 * mg;
+  const NAVY = [11, 42, 74], INK = [13, 21, 38], MUT = [124, 132, 151], LINE = [223, 227, 234], FILL = [242, 244, 248];
+  const k = {doc, W, H, mg, tw, y: 0, page: 0};
+  k.header = () => { if (k.page > 0) doc.addPage(); k.page++;
+    doc.setFillColor(...NAVY); doc.rect(0, 0, W, 22, "F"); doc.addImage(LOGO, "PNG", mg, 4, 14 * LOGO_R, 14); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Rotina PDPL", mg + 14 * LOGO_R + 3.5, 12.5);
+    doc.setFontSize(14); doc.text(pdfTxt(titulo), W - mg, 10.5, {align: "right"}); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(pdfTxt(subtitulo), W - mg, 16, {align: "right"});
+    doc.setTextColor(...MUT); doc.setFontSize(7.5); doc.text(pdfTxt("Rotina PDPL · PDPL/PCEPL-UFV · gerado em " + brDate(todayIso())), mg, H - 6); doc.text(String(k.page), W - mg, H - 6, {align: "right"}); k.y = 31; };
+  k.need = h => { if (k.y + h > H - 14) k.header(); };
+  k.title = t => { k.need(16); doc.setTextColor(...NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(pdfTxt(t), mg, k.y); doc.setDrawColor(...NAVY); doc.setLineWidth(0.5); doc.line(mg, k.y + 2, W - mg, k.y + 2); doc.setLineWidth(0.2); k.y += 8; };
+  k.text = (t, size = 9.5, color = MUT) => { doc.setFont("helvetica", "normal"); doc.setFontSize(size); doc.setTextColor(...color); const ls = doc.splitTextToSize(pdfTxt(t), tw); k.need(ls.length * 4.6 + 2); doc.text(ls, mg, k.y); k.y += ls.length * 4.6 + 2; };
+  k.table = (cols, rows) => { const tot = cols.reduce((s, c0) => s + c0.w, 0); const ws = cols.map(c0 => c0.w / tot * tw); const rh = 6.8;
+    const row = (cells, head) => { doc.setFont("helvetica", head ? "bold" : "normal"); doc.setFontSize(head ? 8.6 : 9.2);
+      const lines = cells.map((t, i) => doc.splitTextToSize(pdfTxt(t ?? ""), ws[i] - 2.4).slice(0, head ? 2 : 1)); const h = head ? Math.max(...lines.map(l => l.length)) * 3.8 + 3.2 : rh;
+      k.need(h + (head ? rh : 0)); if (head) { doc.setFillColor(...FILL); doc.rect(mg, k.y, tw, h, "F"); }
+      doc.setTextColor(...(head ? [74, 83, 104] : INK)); let x = mg;
+      lines.forEach((ls, i) => { if (cols[i].r) doc.text(ls, x + ws[i] - 1.2, k.y + 4.6, {align: "right"}); else doc.text(ls, x + 1.2, k.y + 4.6); x += ws[i]; });
+      doc.setDrawColor(...LINE); doc.line(mg, k.y + h, mg + tw, k.y + h); k.y += h; };
+    row(cols.map(c0 => c0.h), true); rows.forEach(r => { if (k.y + rh > H - 14) { k.header(); row(cols.map(c0 => c0.h), true); } row(r, false); }); k.y += 5; };
+  k.header(); return k;
+}
+async function makeCadPDF(btn) {
+  if (!downloads) { toast("Para baixar o PDF, abra o app pelo Claude."); return; }
+  if (!window.jspdf) { toast("A biblioteca do PDF não carregou. Recarregue a página."); return; }
+  btn.disabled = true; const lb = btn.textContent; btn.textContent = "Gerando PDF…";
+  try {
+    const f = farm(); const k = pdfKit("landscape", "Cadastro de animais", farmLabel(f) + (f.nome && f.produtor ? " · " + f.nome : "") + " — " + brDate(todayIso()));
+    const Wt = lastWeights(S.farmId); const hoje = parseDate(todayIso());
+    const av = avisos(A);
+    if (av.length) { k.title("Avisos do rebanho"); k.table([{h: "Animal", w: 2}, {h: "Aviso", w: 4}, {h: "Data", w: 1.4}, {h: "Quando", w: 1.4}], av.map(x => [x.a.id + (x.a.nome ? " · " + x.a.nome : ""), x.tipo, brDate(x.data), quando(x.dias)])); }
+    const vac = A.filter(a => a.cat === "vaca").sort((x, y) => String(x.id).localeCompare(String(y.id), "pt", {numeric: true}));
+    k.title("Vacas (" + vac.length + ")");
+    k.table([{h: "Brinco", w: 1.1}, {h: "Nome", w: 1.6}, {h: "Lac.", w: 0.6, r: 1}, {h: "Último parto", w: 1.3}, {h: "DEL", w: 0.7, r: 1}, {h: "Última inseminação", w: 1.4}, {h: "Estado", w: 1.2}, {h: "Parto previsto", w: 1.3}, {h: "Secagem prevista", w: 1.3}, {h: "Entrada no pré-parto", w: 1.4}],
+      vac.map(a => { const r = repro(a); const del = a.parto && r.est !== "Seca" ? dayDiff(hoje, parseDate(a.parto)) : null; return [a.id, a.nome || "", isNum(a.lac) ? String(a.lac) : "-", a.parto ? brDate(a.parto) : "-", isNum(del) && del >= 0 ? String(del) : "-", a.ultIA ? brDate(a.ultIA) : "-", r.show, r.partoPrev ? brDate(r.partoPrev) : "-", r.est === "Seca" ? "seca" : r.secPrev ? brDate(r.secPrev) : "-", r.prePrev ? brDate(r.prePrev) : "-"]; }));
+    const jov = A.filter(a => a.cat !== "vaca").sort((x, y) => (y.nasc || "").localeCompare(x.nasc || ""));
+    k.title("Novilhas e bezerras (" + jov.length + ")");
+    k.table([{h: "Brinco", w: 1.1}, {h: "Nome", w: 1.4}, {h: "Categoria", w: 1.3}, {h: "Nascimento", w: 1.2}, {h: "Idade (meses)", w: 1, r: 1}, {h: "Estado", w: 1.1}, {h: "Mãe", w: 1}, {h: "Peso (kg)", w: 0.9, r: 1}, {h: "Última pesagem", w: 1.2}, {h: "Lote", w: 0.8}, {h: "Parto previsto", w: 1.2}],
+      jov.map(a => { const r = repro(a); const w = Wt[normId(a.id)]; const id = idadeMeses(a.nasc); return [a.id, a.nome || "", CAT_NOME[a.cat] || "", a.nasc ? brDate(a.nasc) : "-", isNum(id) ? fmt(id, 1) : "-", a.cat === "novilha" ? r.show : "-", a.mae || "-", w ? fmt(w.peso, 0) : "-", w ? brDate(w.data) : "-", a.lote || "-", r.partoPrev ? brDate(r.partoPrev) : "-"]; }));
+    k.text("Parto previsto = última inseminação + " + GEST + " dias. Secagem prevista 60 dias e entrada no pré-parto 30 dias antes do parto.");
+    await saveFile(safeName("Cadastro de animais - " + farmLabel(f) + " - " + todayIso()) + ".pdf", k.doc.output("blob"));
+  } catch (e) { console.error(e); toast("Não foi possível gerar o PDF."); }
+  btn.disabled = false; btn.textContent = lb;
+}
+async function makeFichaPDF(btn, a) {
+  if (!downloads) { toast("Para baixar o PDF, abra o app pelo Claude."); return; }
+  if (!window.jspdf) { toast("A biblioteca do PDF não carregou. Recarregue a página."); return; }
+  btn.disabled = true; const lb = btn.textContent; btn.textContent = "Gerando PDF…";
+  try {
+    const f = farm(); const r = repro(a); const w = lastWeights(S.farmId)[normId(a.id)]; const id = idadeMeses(a.nasc); const h = fichaHist(a);
+    const del = a.cat === "vaca" && a.parto && r.est !== "Seca" ? dayDiff(parseDate(todayIso()), parseDate(a.parto)) : null;
+    const k = pdfKit("portrait", "Ficha do animal", farmLabel(f) + " — " + brDate(todayIso()));
+    k.title(a.id + (a.nome ? " · " + a.nome : "") + " (" + (CAT_NOME[a.cat] || "") + ")");
+    const kv = [["Nascimento", a.nasc ? brDate(a.nasc) + (a.nascEst ? " (estimada)" : "") : "-"], ["Idade", isNum(id) ? fmt(id, 1) + " meses" : "-"], ["Peso ao nascer", isNum(a.pn) ? fmt(a.pn, 1) + " kg" : "-"], ["Mãe", a.mae || "-"], ["Lote", a.lote || "-"], ["Último peso", w ? fmt(w.peso, 0) + " kg em " + brDate(w.data) : "-"]];
+    if (a.cat === "vaca" || a.cat === "novilha") kv.push(["Estado reprodutivo", r.show], ["Última inseminação", a.ultIA ? brDate(a.ultIA) + (a.touro ? " · " + a.touro : "") : "-"], ["Parto previsto", r.partoPrev ? brDate(r.partoPrev) : "-"], ["Entrada no pré-parto", r.prePrev ? brDate(r.prePrev) : "-"]);
+    if (a.cat === "vaca") kv.push(["Lactações", isNum(a.lac) ? String(a.lac) : "-"], ["Último parto", a.parto ? brDate(a.parto) : "-"], ["DEL", isNum(del) && del >= 0 ? del + " dias" : "-"], ["Secagem prevista", r.est === "Seca" ? "seca" + (a.secagem ? " em " + brDate(a.secagem) : "") : r.secPrev ? brDate(r.secPrev) : "-"]);
+    const half = Math.ceil(kv.length / 2), d = k.doc;
+    for (let i = 0; i < half; i++) { [kv[i], kv[i + half]].forEach((p, j) => { if (!p) return; const x = k.mg + j * (k.tw / 2); d.setFont("helvetica", "normal"); d.setFontSize(8.5); d.setTextColor(124, 132, 151); d.text(pdfTxt(p[0]), x, k.y); d.setFont("helvetica", "bold"); d.setFontSize(10.5); d.setTextColor(13, 21, 38); d.text(pdfTxt(p[1]), x, k.y + 4.6); }); k.y += 11; }
+    k.y += 3;
+    k.title("Histórico de ocorrências");
+    if (h.oc.length) k.table([{h: "Data", w: 1}, {h: "Ocorrência", w: 1.6}, {h: "Detalhes", w: 4}], h.oc.map(o => [brDate(o.data), normId(o.cria) === normId(a.id) ? "Nascimento" : (OC_TIPOS[o.tipo] || o.tipo), normId(o.cria) === normId(a.id) ? "filha de " + (o.animal || "") : ocDesc(o)]));
+    else k.text("Nenhuma ocorrência lançada.");
+    if (h.pes.length) { k.title("Pesagens"); k.table([{h: "Data", w: 1}, {h: "Peso (kg)", w: 1, r: 1}, {h: "Lote", w: 1}], h.pes.map(x => [brDate(x.data), fmt(x.peso, 0), x.lote || ""])); }
+    if (h.lei.length) { k.title("Controle leiteiro e CCS"); k.table([{h: "Data", w: 1}, {h: "Litros no dia", w: 1, r: 1}, {h: "CCS (mil)", w: 1, r: 1}], h.lei.map(x => [brDate(x.data), isNum(x.l) ? fmt(x.l, 1) : "-", isNum(x.ccs) ? fmt(x.ccs, 0) : "-"])); }
+    await saveFile(safeName("Ficha " + a.id + " - " + farmLabel(f)) + ".pdf", k.doc.output("blob"));
+  } catch (e) { console.error(e); toast("Não foi possível gerar o PDF."); }
+  btn.disabled = false; btn.textContent = lb;
+}
+
+/* ---- eventos das telas novas ---- */
+content.addEventListener("click", async e => {
+  const t = e.target.closest("[data-fx],[data-fi],[data-octipo],[data-ocfil],[data-ocrm],[data-perym],[data-perdel]"); if (!t) return;
+  if (t.dataset.fi != null) { fichaIdx = +t.dataset.fi; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.octipo) { ocTipo = t.dataset.octipo; const p = document.getElementById("oc_an"); if (p) ocPre = p.value; render(); return; }
+  if (t.dataset.ocfil) { ocFil = t.dataset.ocfil; render(); return; }
+  if (t.dataset.ocrm) { if (!(await ask("Apagar este registro? As mudanças que ele fez na ficha do animal continuam; corrija a ficha se precisar.", "Apagar"))) return; await saveOcor(S.farmId, ocorOf(S.farmId).filter(o => o.id !== t.dataset.ocrm)); render(); return; }
+  if (t.dataset.perym) { if (!(await leaveOk())) return; S.ym = t.dataset.perym; F = null; S.view = "rotina"; refreshSide(); render(); return; }
+  if (t.dataset.perdel) { const ym = t.dataset.perdel; if (!(await ask("Excluir o período " + ymLong(ym) + " e todos os dados lançados nele (rotina, alimentação, cria e recria, qualidade e controle)? Isso não pode ser desfeito.", "Excluir"))) return;
+    if (guardDemo()) return; try { await delDoc("rec_" + S.farmId + "_" + ym); delete S.recs[recKey(S.farmId, ym)]; calcCache.clear(); if (ym === S.ym) { F = null; dirtyRec = false; pickLatest(); } toast("Período excluído."); render(); } catch (err) { failed(err); } return; }
+  const x = t.dataset.fx;
+  if (x === "goPer") { go("periodos"); return; }
+  if (x === "perCriar") { criarPeriodo(($("#perNovo") || {}).value); return; }
+  if (x === "perCriarCur") { criarPeriodo(S.ym); return; }
+  if (x === "ocAdd") { addOcor(); return; }
+  if (x === "newVaca" || x === "newJovem") { A.push({id: "", nome: "", cat: x === "newVaca" ? "vaca" : "bezerra", nasc: "", pn: null, lote: "", parto: "", lac: x === "newVaca" ? 1 : null}); fichaIdx = A.length - 1; markAnim(); render(); const b = document.getElementById("fk_id"); if (b) b.focus(); return; }
+  if (x === "back") { if (fichaIdx != null && A[fichaIdx] && !A[fichaIdx].id) { A.splice(fichaIdx, 1); } fichaIdx = null; render(); return; }
+  if (x === "saveFicha") { const a = A[fichaIdx]; if (!a || !normId(a.id)) { toast("Coloque o brinco."); return; }
+    if (A.some((y, j) => j !== fichaIdx && normId(y.id) === normId(a.id))) { toast("Já existe outro animal com o brinco " + normId(a.id) + "."); return; }
+    const idn = normId(a.id); dirtyAnim = true; if (await doSave()) { fichaIdx = A.findIndex(y => normId(y.id) === idn); toast("Ficha salva."); render(); } return; }
+  if (x === "delAn") { const a = A[fichaIdx]; if (!a) return; if (!(await ask(`Excluir ${a.id || "este animal"} do cadastro? Use isto só para corrigir erros; para venda ou morte, lance a ocorrência para ficar no histórico.`, "Excluir"))) return;
+    A.splice(fichaIdx, 1); fichaIdx = null; dirtyAnim = true; if (await doSave()) toast("Animal excluído."); render(); return; }
+  if (x === "ocFor") { const a = A[fichaIdx]; if (!(await leaveOk())) return; ocPre = a ? a.id : ""; fichaIdx = null; S.view = "ocorrencias"; refreshSide(); render(); window.scrollTo(0, 0); return; }
+  if (x === "pdfCad") { makeCadPDF(t); return; }
+  if (x === "pdfFicha") { const a = A[fichaIdx]; if (a) makeFichaPDF(t, a); return; }
+});
+content.addEventListener("input", e => {
+  const t = e.target;
+  if (t.id === "anBusca") { anBusca = t.value; const b = document.getElementById("anTabs"); if (b) b.innerHTML = anTablesHTML(); return; }
+  if (t.dataset.fk && fichaIdx != null && A[fichaIdx]) { const k = t.dataset.fk; A[fichaIdx][k] = k === "pn" || k === "lac" ? toNum(t.value) : t.value; if (k === "nasc") A[fichaIdx].nascEst = false; markAnim(); }
+});
+content.addEventListener("change", e => { const t = e.target; if (t.dataset.fk && fichaIdx != null && A[fichaIdx]) { const k = t.dataset.fk; A[fichaIdx][k] = k === "pn" || k === "lac" ? toNum(t.value) : t.value; markAnim(); if (["cat", "estado", "ultIA", "parto", "nasc"].includes(k)) render(); } });
+
 if (!window.RPDPL_APP) (function start() {
   refreshSide(); render();
   setTimeout(() => { if (!S.loaded) { S.loaded = true; refreshSide(); render(); } }, 10000);
@@ -2071,7 +2406,7 @@ if (!window.RPDPL_APP) (function start() {
     col.onSnapshot(snap => {
       const fsn = {}, rsn = {}, asn = {}, csn = {};
       snap.docs.forEach(d => { const o = d.data(); if (!o) return;
-        if (d.id.startsWith("farm_")) fsn[o.id] = o; else if (d.id.startsWith("rec_")) rsn[recKey(o.farmId, o.ym)] = o; else if (d.id.startsWith("anim_")) asn[o.farmId] = o.list || []; else if (d.id.startsWith("acoes_")) csn[o.farmId] = o.list || []; else if (d.id === "livro") S.livro = o.list || []; });
+        if (d.id.startsWith("farm_")) fsn[o.id] = o; else if (d.id.startsWith("rec_")) rsn[recKey(o.farmId, o.ym)] = o; else if (d.id.startsWith("anim_")) asn[o.farmId] = o.list || []; else if (d.id.startsWith("acoes_")) csn[o.farmId] = o.list || []; else if (d.id.startsWith("ocor_")) S.ocor[o.farmId] = o.list || []; else if (d.id === "livro") S.livro = o.list || []; });
       S.farms = fsn; S.recs = rsn; S.anims = asn; S.acoes = csn; S.loaded = true; calcCache.clear();
       if (!snap.metadata.fromCache) { clearTimeout(timer); setStatus("cloud", "Salvo na nuvem"); }
       refreshSide();
