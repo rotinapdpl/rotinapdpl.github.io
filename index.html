@@ -231,6 +231,8 @@ table.ctr th,table.ctr td{text-align:center}
 .dt-soon{color:#b35c00;font-weight:600}.dt-late{color:#b3261e;font-weight:700}
 .est{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12.5px;font-weight:600;background:var(--surface-2);color:var(--ink2)}
 .est-prenhe{background:rgba(18,140,76,.14);color:#0d6b3a}.est-inseminada{background:rgba(31,155,181,.15);color:#13697b}.est-seca{background:rgba(124,92,196,.14);color:#5b3fa0}.est-prparto{background:rgba(235,104,52,.16);color:#a3441a}.est-descarte{background:rgba(179,38,30,.12);color:#8c1d17}
+svg.mi{width:18px;height:18px;flex:none;margin-right:10px;vertical-align:-4px;opacity:.88}
+.est-empev{background:rgba(154,163,181,.22);color:#4a5368}.est-aberta{background:rgba(235,104,52,.16);color:#a3441a}
 </style>
 <meta name="theme-color" content="#0b2a4a">
 <link rel="manifest" href="manifest.webmanifest">
@@ -254,6 +256,7 @@ table.ctr th,table.ctr td{text-align:center}
       <button data-view="ocorrencias">Ocorrências</button>
       <button data-view="rotina">Rotina do mês</button>
       <button data-view="cria">Cria e Recria</button>
+      <button data-view="reproducao">Reprodução</button>
       <button data-view="qualidade">Qualidade do leite</button>
       <button data-view="alimentacao">Alimentação</button>
       <button data-view="controle">Controle Leiteiro</button>
@@ -592,6 +595,7 @@ function calc(r, al, f) {
   // cria e recria
   const cs = crStats(r, al, f);
   if (cs && cs.n) { o.cr_ = cs; o.crN = cs.n; o.crPeso = cs.peso; o.crGmd = cs.gmd; o.crGpp = cs.gpp; o.crIA = cs.ia; o.crIPP = cs.ipp; }
+  if (r && r.repro && isNum(r.repro.delMed)) o.del = r.repro.delMed;
   return o;
 }
 
@@ -654,7 +658,7 @@ const IND = [
   {g: "Controle leiteiro"},
   {k: "pesN", t: "Vacas no controle", u: "vacas", d: 0},
   {k: "pesMedia", t: "Média do controle", u: "L/vaca/dia", d: 1, up: true},
-  {k: "del", t: "DEL médio", u: "dias", d: 0, up: false},
+  {k: "del", t: "DEL médio (vacas em lactação)", u: "dias", d: 0, up: false},
   {k: "prevSub", t: "Vacas com CCS > 200 mil", u: "% das analisadas", d: 0, up: false},
   {k: "ccsGeo", t: "CCS individual (média geométrica)", u: "mil cél/mL", d: 0, up: false},
   {k: "ccsPerdaDia", t: "Perda estimada pela CCS individual", u: "kg/dia", d: 1, up: false},
@@ -717,7 +721,7 @@ const DEMO = (() => {
 /* ============ gráficos ============ */
 const charts = [];
 /* escreve o valor de cada ponto/coluna no gráfico (pro quadro impresso) */
-const YT = {g_pvr: "% do rebanho", g_pl: "% das vacas", g_ccs: "Mil células/mL", g_cbt: "Mil UFC/mL", g_gp: "%", g_rmca: "Litros por vaca por dia", g_rmcah: "R$ por vaca por dia",
+const YT = {g_rpdel: "Dias", g_rpprenh: "% das vacas", g_pvr: "% do rebanho", g_pl: "% das vacas", g_ccs: "Mil células/mL", g_cbt: "Mil UFC/mL", g_gp: "%", g_rmca: "Litros por vaca por dia", g_rmcah: "R$ por vaca por dia",
   g_vlha: "Vacas em lactação por hectare", g_troca: "Litros por kg de concentrado", g_precos: "R$", g_rlc: "Litros por kg de concentrado", g_cria: "Meses", g_crh: "kg por dia", g_curva: "Litros por dia",
   g_crs: "Peso (kg)", g_delfx: "Número de vacas", g_ccsfx: "Número de vacas", g_ccstop: "kg de leite por dia", g_ccsgeo: "Mil células/mL", g_prevh: "% das vacas analisadas", g_pesh: "Litros por vaca por dia",
   g_lpv: "Litros por vaca por dia", g_renda: "% da renda bruta do leite", g_cl: "R$ por animal por dia", g_crp: "Peso (kg)", g_crg: "kg por dia", g_cmt: "% da produção potencial", g_cmtrs: "R$ por mês"};
@@ -793,6 +797,7 @@ function defsFor(view, T) {
   const lots = (c.lotes || []).filter(x => x.kt > 0); const lact = lots.filter(x => x.lact);
   const crL = c.cr_ ? c.cr_.lotes : [];
   const all = {
+    ...reproDefs(D, T, L, months),
     leite: () => D("g_leite", "Produção de leite", "litros por dia", hasAny(s("leiteDia")), () => ({type: "bar", data: {labels: L, datasets: [barDs("Leite", s("leiteDia"), T.s[0])]}, options: opts(T, {unit: "L/dia", yMin: 0, dec: 0})})),
     lpv: () => D("g_lpv", "Leite por vaca em lactação", "L/vaca/dia", hasAny(s("lPorVL")), () => ({type: "line", data: {labels: L, datasets: [lineDs("L/vaca em lactação", s("lPorVL"), T.s[0]), ...metaDs(M, "lPorVL", n, T)]}, options: opts(T, {unit: "L", legend: true, yMin: 0})})),
     reb: () => { const ks0 = ["vl", "vs", "pp", "nov", "novm", "bzf", "bzm", "touro"], nm0 = ["Vacas em lactação", "Vacas secas", "Pré-parto", "Novilhas", "Novilhos", "Bezerras", "Bezerros", "Touros"];
@@ -877,8 +882,9 @@ function pageHead(title, withMonth = true, extra = "") {
 }
 
 /* ============ painel ============ */
-const TILES = ["leiteDia", "lPorVL", "lTrab", "pctLact", "ccs", "cbt", "cmtPerda", "pctConcRenda", "pctVolRenda", "rmcaVaca", "crGmd", "crIPP"];
+const TILES = ["leiteDia", "lPorVL", "lTrab", "pctLact", "ccs", "cbt", "cmtPerda", "pctConcRenda", "pctVolRenda", "del", "crGmd", "crIPP"];
 function tileState(k, v, M) { const m = M[k]; if (!m || !isNum(v)) return null; return m.dir === "min" ? v >= m.v : v <= m.v; }
+function liveDel(c0) { const v = reproStats(animsOf(S.farmId), farmPev(), todayIso()).delMed; return isNum(v) ? Object.assign({}, c0, {del: v}) : c0; }
 function tileHTML(k, c, p, M) {
   const i = INDK[k]; const v = c[k]; const pv = p ? p[k] : null; const st = tileState(k, v, M); const m = M[k];
   const chip = st == null ? "" : `<span class="chip ${st ? "ok" : "bad"}">${st ? "✓ Na meta" : "! Fora da meta"}</span><span>meta ${m.dir === "min" ? "≥" : "≤"} ${fmtInd(k, m.v)}</span>`;
@@ -908,6 +914,7 @@ function talkingPoints(c, p, M) {
 const PAINEL = [
   {t: "Produção", ks: ["leite", "lpv", "lTrab", "lHa"]},
   {t: "Rebanho", ks: ["reb", "pctLact", "pctVacasReb", "vlHa"]},
+  {t: "Reprodução (estado de hoje por faixa de DEL)", ks: ["rpF1", "rpF2", "rpF3", "rpF4"]},
   {t: "Qualidade do leite", ks: ["ccs", "cbt", "cmt", "cmtRS"]},
   {t: "Alimentação", ks: ["renda", "rlc", "troca"], tables: true},
   {t: "Cria e recria", ks: ["crPeso", "crGmd", "crIA", "crHist"]}
@@ -930,7 +937,7 @@ function otherTableHTML(c) {
     <tr><td><b>Total</b></td><td></td><td class="n"><b>${fmt(rows.reduce((a, x) => a + x.qtd, 0), 0)}</b></td><td></td><td class="n"><b>${brl(tot, 2)}</b></td><td class="n"><b>${brl(tot * MES, 0)}</b></td></tr></tbody></table></div>`;
 }
 function renderPainel(el) {
-  const r = rec(); const c = cm(S.ym); const prevYm = farmMonths().filter(m => m < S.ym).pop(); const p = prevYm ? cm(prevYm) : null; const M = metas();
+  const r = rec(); const c = liveDel(cm(S.ym)); const prevYm = farmMonths().filter(m => m < S.ym).pop(); const p = prevYm ? cm(prevYm) : null; const M = metas();
   const pdfBtn = `<button class="btn primary" data-act="pdf">Gerar PDF do quadro</button>`;
   if (!r) { el.innerHTML = pageHead("Painel") + `<div class="box"><h3>Nada lançado em ${esc(ymLong(S.ym))}</h3><p class="note" style="margin:0 0 10px">${farmMonths().length ? "Este período ainda não foi criado. Escolha outro período ou crie este." : "Este produtor ainda não tem períodos. Crie o primeiro para começar."}</p><button class="btn primary" data-fx="goPer">Ir para Períodos</button></div>`; return; }
   const tp = talkingPoints(c, p, M); const T = theme(); const allDefs = [];
@@ -956,7 +963,7 @@ async function makePDF(btn) {
   btn.disabled = true; btn.textContent = "Gerando PDF…";
   try {
     const {jsPDF} = window.jspdf; const doc = new jsPDF({orientation: "landscape", unit: "mm", format: "a4"});
-    const W = 297, H = 210, mg = 10; const f = farm(); const c = cm(S.ym); const prevYm = farmMonths().filter(m => m < S.ym).pop(); const p = prevYm ? cm(prevYm) : null; const M = metas();
+    const W = 297, H = 210, mg = 10; const f = farm(); const c = liveDel(cm(S.ym)); const prevYm = farmMonths().filter(m => m < S.ym).pop(); const p = prevYm ? cm(prevYm) : null; const M = metas();
     let page = 0;
     const newPage = (title) => { if (page > 0) doc.addPage(); page++;
       doc.setFillColor(11, 42, 74); doc.rect(0, 0, W, 24, "F"); doc.addImage(LOGO, "PNG", mg, 4.5, 15 * LOGO_R, 15); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Rotina PDPL", mg + 15 * LOGO_R + 4, 11); doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.text("Gestão à vista", mg + 15 * LOGO_R + 4, 16.5);
@@ -1077,9 +1084,11 @@ const dtIn = s => { const d = parseDate(s); return d ? isoDate(d) : ""; };
 
 /* ---- Rotina do mês ---- */
 function totLeiteHTML() { const c = calcF(); return `<div class="field"><label>Leite total produzido <small>(soma)</small></label><div class="inwrap"><input type="text" id="leiteTot" readonly value="${fmt(c.leiteDia, 0)}" aria-label="Leite total produzido"><span>L/dia</span></div></div>`; }
+function herdHint() { if (!animList().length) return ""; const h = herdFromCad(animList());
+  return `</div><p class="note" style="margin:10px 0 0">Pelo cadastro hoje: ${h.vl} em lactação · ${h.vs} secas · ${h.pp} no pré-parto · ${h.nov} novilhas · ${h.bzf} bezerras · ${h.bzm} bezerros. Novilhos, touros e animais de serviço são lançados aqui. <button class="btn sm" data-fx="herdCad" style="margin-left:6px">Usar números do cadastro</button></p><div>`; }
 function renderRotina(el) {
-  ensureForm(); const prevYm = farmMonths().filter(m => m < S.ym).pop(); const defs = defsFor("rotina", theme());
-  const box = s0 => `<div class="box"><h3>${esc(s0.t)} ${s0.hint ? `<span class="note" style="font-weight:400">· ${esc(s0.hint)}</span>` : ""}</h3><div class="fields">${s0.f.map(fieldHTML).join("")}${s0.t === "Produção de leite" ? totLeiteHTML() + fieldHTML(["preco", "Preço recebido", "R$/L"]) : ""}</div>${s0.t === "Produção de leite" ? `<p class="note" style="margin:8px 0 0">O total é sempre a soma dos quatro destinos. A renda bruta usa o leite total produzido (valor econômico da atividade).</p>` : ""}</div>`;
+  ensureForm(); if (animList().length && S.ym === nowYm() && HERD_K.every(k => !isNum(F.d[k]))) { Object.assign(F.d, herdFromCad(animList())); markRec(); } const prevYm = farmMonths().filter(m => m < S.ym).pop(); const defs = defsFor("rotina", theme());
+  const box = s0 => `<div class="box"><h3>${esc(s0.t)} ${s0.hint ? `<span class="note" style="font-weight:400">· ${esc(s0.hint)}</span>` : ""}</h3><div class="fields">${s0.f.map(fieldHTML).join("")}${s0.t === "Rebanho" ? herdHint() : ""}${s0.t === "Produção de leite" ? totLeiteHTML() + fieldHTML(["preco", "Preço recebido", "R$/L"]) : ""}</div>${s0.t === "Produção de leite" ? `<p class="note" style="margin:8px 0 0">O total é sempre a soma dos quatro destinos. A renda bruta usa o leite total produzido (valor econômico da atividade).</p>` : ""}</div>`;
   el.innerHTML = pageHead("Rotina do mês", true, prevYm ? `<button class="btn" data-act="copyRot">Copiar rebanho de ${esc(ymLabel(prevYm))}</button>` : "") +
     `<div class="form-wrap"><div>${ROTINA.map(box).join("")}</div>
     <aside class="preview" aria-live="polite"><h3>Resultado do mês</h3><dl id="pv"></dl>${saveBar()}${rec() ? `<button class="btn sm danger" data-act="delRec" style="margin-top:10px">Excluir todos os dados de ${esc(ymLabel(S.ym))}</button>` : ""}</aside></div>
@@ -1888,6 +1897,7 @@ async function doSave() {
     if (F) F.cr.rows.forEach(r => { const a = list.find(x => x.id === normId(r.id)); if (a && r.lote) a.lote = r.lote; });
     ok = await saveAnims(S.farmId, list); if (ok) { A = clone(list); A._fid = S.farmId; dirtyAnim = false; } }
   if (ok && dirtyRec && F) {
+    if (F.ym === nowYm() && F.farmId === S.farmId) F.repro = reproStats(animList(), farmPev(), todayIso());
     F.pes = F.pes.filter(x => x.id || isNum(x.l)); F.cr.rows = F.cr.rows.filter(x => x.id && (isNum(x.peso) || isNum(x.pa))); F.ingr = F.ingr.filter(x => x.n || isNum(x.p));
     Object.keys(F.d).forEach(k => { if (F.d[k] == null) delete F.d[k]; });
     const r = clone(F); delete r.dieta; ok = await saveRec(r); if (ok) dirtyRec = false;
@@ -1944,7 +1954,7 @@ async function importBackup(file) {
 }
 
 /* ============ navegação ============ */
-const VIEWS = {acoes: renderAcoes, painel: renderPainel, rotina: renderRotina, alimentacao: renderAlim, cria: renderCria, qualidade: renderQual, controle: renderControle, animais: renderAnimais, metas: renderMetas, historico: renderHist, periodos: renderPeriodos, ocorrencias: renderOcor};
+const VIEWS = {acoes: renderAcoes, painel: renderPainel, rotina: renderRotina, alimentacao: renderAlim, cria: renderCria, qualidade: renderQual, controle: renderControle, animais: renderAnimais, metas: renderMetas, historico: renderHist, periodos: renderPeriodos, ocorrencias: renderOcor, reproducao: renderRepro};
 function refreshSide() {
   S.demo = S.loaded && Object.keys(S.farms).length === 0;
   const fs = farms(); if (S.farmId && !fs[S.farmId]) S.farmId = null;
@@ -2069,7 +2079,8 @@ function repro(a) {
   const partoPrev = pren ? addDays(a.ultIA, GEST) : "";
   const secPrev = partoPrev && a.cat === "vaca" ? addDays(partoPrev, -60) : "";
   const prePrev = partoPrev ? addDays(partoPrev, -30) : "";
-  const show = partoPrev && daysTo(prePrev) <= 0 ? "Pré-parto" : est;
+  let show = partoPrev && daysTo(prePrev) <= 0 ? "Pré-parto" : est;
+  if (a.cat === "vaca" && est === "Vazia" && a.parto) { const del = -daysTo(a.parto); if (del >= 0) show = del < farmPev() ? "Em PEV" : "Aberta"; }
   return {est, show, partoPrev, secPrev, prePrev};
 }
 function lastWeights(fid) {
@@ -2168,7 +2179,7 @@ function renderFicha(el, i) {
     ${isV || isN ? `<div class="box"><h3>Reprodução</h3><div class="fields">
       ${isV ? fi("lac", "Nº de lactações") + fi("parto", "Data do último parto", "date") : ""}${fi("ultIA", "Última inseminação", "date")}${fi("touro", "Touro ou sêmen")}
       <div class="field"><label for="fk_estado">Estado reprodutivo</label><select id="fk_estado" data-fk="estado">${est.map(s => `<option${r.est === s ? " selected" : ""}>${s}</option>`).join("")}</select></div>
-      ${isV ? ro("DEL (dias em lactação)", isNum(del) && del >= 0 ? del : "—") : ""}${ro("Parto previsto", r.partoPrev ? brDate(r.partoPrev) : "—")}${isV ? ro("Secagem prevista (60 dias antes)", r.secPrev ? brDate(r.secPrev) : "—") : ""}${ro("Entrada no pré-parto (30 dias antes)", r.prePrev ? brDate(r.prePrev) : "—")}</div>
+      ${isV ? ro("DEL (dias em lactação)", isNum(del) && del >= 0 ? del : "—") + ro("Fim do PEV (" + farmPev() + " dias)", a.parto ? brDate(addDays(a.parto, farmPev())) + (isNum(del) && del >= 0 && del < farmPev() ? " · em PEV" : "") : "—") : ""}${ro("Parto previsto", r.partoPrev ? brDate(r.partoPrev) : "—")}${isV ? ro("Secagem prevista (60 dias antes)", r.secPrev ? brDate(r.secPrev) : "—") : ""}${ro("Entrada no pré-parto (30 dias antes)", r.prePrev ? brDate(r.prePrev) : "—")}</div>
       <p class="note" style="margin:8px 0 0">O parto previsto conta ${GEST} dias a partir da última inseminação, quando o estado é Inseminada, Prenhe ou Seca.</p></div>` : ""}
     <div class="box"><h3>Desenvolvimento</h3><div class="fields">${ro("Idade", isNum(id) ? fmt(id, 1) + " meses" : "—")}${ro("Último peso", w ? fmt(w.peso, 0) + " kg em " + brDate(w.data) : "—")}</div></div>
     <div class="row-actions"><button class="btn primary" data-fx="saveFicha">Salvar ficha</button><button class="btn danger" data-fx="delAn">Excluir do cadastro</button></div>
@@ -2251,9 +2262,12 @@ async function addOcor() {
   }
   if (t === "venda" || t === "morte") { o.motivo = v("oc_motivo"); o.valor = toNum(v("oc_valor")); o.dest = v("oc_dest"); o.causa = v("oc_causa"); o.ani = clone(a); A.splice(A.indexOf(a), 1); }
   Object.keys(o).forEach(k => { if (o[k] === "" || o[k] == null) delete o[k]; });
+  const prevOc = ocorOf(S.farmId);
+  if (!(await saveOcor(S.farmId, prevOc.concat([o])))) { S.ocor[S.farmId] = prevOc; A = bak; A._fid = S.farmId; return; }
   dirtyAnim = true;
-  const ok = await doSave(); if (!ok) { A = bak; A._fid = S.farmId; return; }
-  if (await saveOcor(S.farmId, ocorOf(S.farmId).concat([o]))) { toast(OC_TIPOS[t] + " lançad" + (["ia", "diag", "seca", "mast", "compra", "venda", "morte"].includes(t) ? "a" : "o") + "."); ocPre = ""; render(); }
+  const ok = await doSave(); if (!ok) { A = bak; A._fid = S.farmId; await saveOcor(S.farmId, prevOc); return; }
+  snapRepro();
+  { toast(OC_TIPOS[t] + " lançad" + (["ia", "diag", "seca", "mast", "compra", "venda", "morte"].includes(t) ? "a" : "o") + "."); ocPre = ""; render(); }
 }
 
 /* ---- Períodos ---- */
@@ -2280,6 +2294,7 @@ async function criarPeriodo(ym) {
   const r = {farmId: S.farmId, ym, d: {}, pes: [], dataPes: "", cr: {data: "", dataAnt: "", rows: []}};
   const pv = farmMonths().filter(m => m < ym).reverse().map(m => rec(m)).find(x => x && lotesOf(x).lotes.length);
   const lo = pv ? lotesOf(pv) : {lotes: [], ingr: [], mix: []}; r.lotes = clone(lo.lotes); r.ingr = clone(lo.ingr); r.mix = clone(lo.mix || []);
+  if (ym === nowYm() && animsOf(S.farmId).length) { r.d = herdFromCad(animsOf(S.farmId)); r.repro = reproStats(animsOf(S.farmId), farmPev(), todayIso()); }
   if (await saveRec(r)) { S.ym = ym; F = null; toast("Período " + ymLong(ym) + " criado."); S.view = "rotina"; refreshSide(); render(); }
 }
 function renderGate(el) {
@@ -2377,9 +2392,9 @@ content.addEventListener("click", async e => {
   if (x === "back") { if (fichaIdx != null && A[fichaIdx] && !A[fichaIdx].id) { A.splice(fichaIdx, 1); } fichaIdx = null; render(); return; }
   if (x === "saveFicha") { const a = A[fichaIdx]; if (!a || !normId(a.id)) { toast("Coloque o brinco."); return; }
     if (A.some((y, j) => j !== fichaIdx && normId(y.id) === normId(a.id))) { toast("Já existe outro animal com o brinco " + normId(a.id) + "."); return; }
-    const idn = normId(a.id); dirtyAnim = true; if (await doSave()) { fichaIdx = A.findIndex(y => normId(y.id) === idn); toast("Ficha salva."); render(); } return; }
+    const idn = normId(a.id); dirtyAnim = true; if (await doSave()) { snapRepro(); fichaIdx = A.findIndex(y => normId(y.id) === idn); toast("Ficha salva."); render(); } return; }
   if (x === "delAn") { const a = A[fichaIdx]; if (!a) return; if (!(await ask(`Excluir ${a.id || "este animal"} do cadastro? Use isto só para corrigir erros; para venda ou morte, lance a ocorrência para ficar no histórico.`, "Excluir"))) return;
-    A.splice(fichaIdx, 1); fichaIdx = null; dirtyAnim = true; if (await doSave()) toast("Animal excluído."); render(); return; }
+    A.splice(fichaIdx, 1); fichaIdx = null; dirtyAnim = true; if (await doSave()) { snapRepro(); toast("Animal excluído."); } render(); return; }
   if (x === "ocFor") { const a = A[fichaIdx]; if (!(await leaveOk())) return; ocPre = a ? a.id : ""; fichaIdx = null; S.view = "ocorrencias"; refreshSide(); render(); window.scrollTo(0, 0); return; }
   if (x === "pdfCad") { makeCadPDF(t); return; }
   if (x === "pdfFicha") { const a = A[fichaIdx]; if (a) makeFichaPDF(t, a); return; }
@@ -2390,6 +2405,106 @@ content.addEventListener("input", e => {
   if (t.dataset.fk && fichaIdx != null && A[fichaIdx]) { const k = t.dataset.fk; A[fichaIdx][k] = k === "pn" || k === "lac" ? toNum(t.value) : t.value; if (k === "nasc") A[fichaIdx].nascEst = false; markAnim(); }
 });
 content.addEventListener("change", e => { const t = e.target; if (t.dataset.fk && fichaIdx != null && A[fichaIdx]) { const k = t.dataset.fk; A[fichaIdx][k] = k === "pn" || k === "lac" ? toNum(t.value) : t.value; markAnim(); if (["cat", "estado", "ultIA", "parto", "nasc"].includes(k)) render(); } });
+
+/* ---- Reprodução ---- */
+const farmPev = () => { const f = farm() || {}; return isNum(f.pev) ? f.pev : 45; };
+const RP_CL = {pev: "Em PEV", aberta: "Abertas", insem: "Inseminadas", prenhe: "Prenhes", descarte: "Descarte"};
+const RP_COL = {pev: "#9aa3b5", aberta: "#eb6834", insem: "#1f9bb5", prenhe: "#128c4c", descarte: "#b3261e"};
+function rpClasse(a, del, pev) { const e = a.estado || "Vazia"; return e === "Descarte" ? "descarte" : e === "Prenhe" ? "prenhe" : e === "Inseminada" ? "insem" : del < pev ? "pev" : "aberta"; }
+function reproStats(list, pev, iso) {
+  const hoje = parseDate(iso || todayIso()); const zero = () => ({pev: 0, aberta: 0, insem: 0, prenhe: 0, descarte: 0});
+  const cnt = zero(), fx = [zero(), zero(), zero(), zero()], dels = [];
+  list.filter(a => a.cat === "vaca" && a.parto && (a.estado || "") !== "Seca").forEach(a => { const del = dayDiff(hoje, parseDate(a.parto)); if (!(del >= 0)) return;
+    dels.push(del); const k = rpClasse(a, del, pev); cnt[k]++; fx[del <= 100 ? 0 : del <= 200 ? 1 : del <= 300 ? 2 : 3][k]++; });
+  const ps = list.filter(a => a.cat === "vaca" && a.parto && a.ultIA && ["Prenhe", "Seca"].includes(a.estado) && parseDate(a.ultIA) > parseDate(a.parto)).map(a => dayDiff(parseDate(a.ultIA), parseDate(a.parto)));
+  const vacas = list.filter(a => a.cat === "vaca"); const pren = vacas.filter(a => ["Prenhe", "Seca"].includes(a.estado) && a.ultIA).length;
+  const r1 = v => isNum(v) ? Math.round(v * 10) / 10 : null;
+  return {data: isoDate(hoje), pev, n: dels.length, delMed: r1(mean(dels)), cnt, fx, ps: r1(mean(ps)), iep: isNum(mean(ps)) ? r1(mean(ps) + GEST) : null, pctPrenhe: vacas.length ? r1(pren / vacas.length * 100) : null};
+}
+async function snapRepro() {
+  const ym = nowYm(); const r = rec(ym); if (!r || S.demo) return;
+  const st = reproStats(animsOf(S.farmId), farmPev(), todayIso()); if (r.repro && JSON.stringify(r.repro) === JSON.stringify(st)) return;
+  if (F && F.ym === ym && F.farmId === S.farmId) F.repro = st;
+  await saveRec(Object.assign(clone(r), {repro: st}));
+}
+const pieOpts = T => ({responsive: true, maintainAspectRatio: false, animation: false, plugins: {legend: {display: true, position: "right", labels: {color: T.ink, boxWidth: 14, font: {size: 13}, padding: 10}},
+  tooltip: {backgroundColor: T.ink, titleColor: T.surface, bodyColor: T.surface, callbacks: {label: q => " " + q.label}}}});
+function reproDefs(D, T, L, months) {
+  const st = reproStats(animsOf(S.farmId), farmPev(), todayIso());
+  const pie = (id, title, cnt) => { const ks = Object.keys(RP_CL).filter(k => cnt[k] > 0); const vals = ks.map(k => cnt[k]); const tot = vals.reduce((a, b) => a + b, 0);
+    return D(id, title, tot ? tot + (tot > 1 ? " vacas" : " vaca") + " em lactação, hoje" : "", tot > 0, () => ({type: "pie",
+      data: {labels: ks.map((k, i) => `${RP_CL[k]}: ${vals[i]} (${fmt(vals[i] / tot * 100, 0)}%)`), datasets: [{data: vals, backgroundColor: ks.map(k => RP_COL[k]), borderColor: T.surface, borderWidth: 2}]}, options: pieOpts(T)}), "Nenhuma vaca em lactação nesta faixa de DEL."); };
+  const hist = months.map(m => { const r = rec(m); return r && r.repro && isNum(r.repro.delMed) ? Math.round(r.repro.delMed) : null; });
+  const pp = months.map(m => { const r = rec(m); return r && r.repro && isNum(r.repro.pctPrenhe) ? r.repro.pctPrenhe : null; });
+  return {
+    rpGeral: () => pie("g_rpg", "Estado reprodutivo das vacas em lactação", st.cnt),
+    rpF1: () => pie("g_rpf1", "DEL de 0 a 100 dias", st.fx[0]),
+    rpF2: () => pie("g_rpf2", "DEL de 101 a 200 dias", st.fx[1]),
+    rpF3: () => pie("g_rpf3", "DEL de 201 a 300 dias", st.fx[2]),
+    rpF4: () => pie("g_rpf4", "DEL acima de 300 dias", st.fx[3]),
+    rpDelH: () => D("g_rpdel", "DEL médio das vacas em lactação", "no dia da visita de cada mês", hasAny(hist), () => ({type: "bar", data: {labels: L, datasets: [barDs("DEL médio", hist, T.s[0])]}, options: opts(T, {unit: "dias", yMin: 0, dec: 0})}), "O DEL médio de cada mês é registrado no dia da visita."),
+    rpPrenH: () => D("g_rpprenh", "Vacas prenhes no rebanho", "% das vacas (lactação e secas)", hasAny(pp), () => ({type: "bar", data: {labels: L, datasets: [barDs("% prenhes", pp, T.s[2])]}, options: opts(T, {unit: "%", yMin: 0, dec: 0})}), "Registrado no dia da visita de cada mês.")
+  };
+}
+function renderRepro(el) {
+  ensureForm();
+  const pev = farmPev(); const st = reproStats(animList(), pev, todayIso()); const defs = defsFor(["rpGeral", "rpF1", "rpF2", "rpF3", "rpF4", "rpDelH", "rpPrenH"], theme());
+  const card = (t, v, u, note) => `<div class="tile"><div class="t">${esc(t)}</div><div class="v">${v}<small>${esc(u)}</small></div>${note ? `<div class="meta"><span>${esc(note)}</span></div>` : ""}</div>`;
+  const hist = farmMonths().slice().reverse().map(m => ({m, r: rec(m)})).filter(x => x.r && x.r.repro);
+  const atrasadas = animList().filter(a => a.cat === "vaca" && a.parto && (a.estado || "Vazia") === "Vazia").map(a => ({a, del: dayDiff(parseDate(todayIso()), parseDate(a.parto))})).filter(x => x.del >= pev).sort((x, y) => y.del - x.del);
+  el.innerHTML = pageHead("Reprodução", false, rec(nowYm()) ? `<button class="btn" data-fx="snapRepro">Registrar hoje em ${esc(ymLabel(nowYm()))}</button>` : "") + `
+    <div class="box"><div class="fields" style="max-width:640px"><div class="field"><label for="rpPev">PEV desta fazenda (Período de Espera Voluntário)</label><div class="inwrap"><input type="text" inputmode="numeric" id="rpPev" value="${pev}"><span>dias</span></div></div>
+      <div class="field" style="align-self:end"><button class="btn" data-fx="savePev">Salvar PEV</button></div></div>
+      <p class="note" style="margin:8px 0 0">Vaca <b>em PEV</b>: pariu há menos de ${pev} dias e ainda não deve ser inseminada. <b>Aberta</b>: já passou do PEV e ainda não foi inseminada. Os gráficos usam só as vacas em lactação, com o estado de hoje do cadastro.</p></div>
+    <div class="tiles">${card("DEL médio (vacas em lactação)", isNum(st.delMed) ? fmt(st.delMed, 0) : "—", "dias", st.n + " vacas em lactação")}${card("Vacas prenhes no rebanho", isNum(st.pctPrenhe) ? fmt(st.pctPrenhe, 0) : "—", "%", "lactação e secas")}
+      ${card("Abertas depois do PEV", String(st.cnt.aberta), st.cnt.aberta === 1 ? "vaca" : "vacas", "não inseminadas")}${card("Período de serviço médio", isNum(st.ps) ? fmt(st.ps, 0) : "—", "dias", "do parto à inseminação que emprenhou")}
+      ${card("Intervalo entre partos previsto", isNum(st.iep) ? fmt(st.iep / MES, 1) : "—", "meses", isNum(st.iep) ? fmt(st.iep, 0) + " dias" : "")}</div>
+    <div class="sec-title">Estado reprodutivo por faixa de DEL</div><div class="grid">${chartCards(defs)}</div>
+    ${atrasadas.length ? `<div class="box"><h3>Vacas abertas depois do PEV</h3><div class="tbl-wrap"><table><thead><tr><th>Vaca</th><th>Nome</th><th>Último parto</th><th class="n">DEL</th></tr></thead><tbody>${atrasadas.map(x => `<tr class="rowlink" data-fiid="${esc(x.a.id)}"><td><b>${esc(x.a.id)}</b></td><td>${esc(x.a.nome || "")}</td><td>${brDate(x.a.parto)}</td><td class="n ${x.del > pev + 60 ? "dt-late" : "dt-soon"}">${x.del}</td></tr>`).join("")}</tbody></table></div></div>` : ""}
+    <div class="box"><h3>Evolução mês a mês <span class="note" style="font-weight:400">· no dia da visita</span></h3><div class="tbl-wrap"><table><thead><tr><th>Período</th><th>Registrado em</th><th class="n">DEL médio</th><th class="n">Em lactação</th><th class="n">Em PEV</th><th class="n">Abertas</th><th class="n">Inseminadas</th><th class="n">Prenhes</th><th class="n">Descarte</th><th class="n">% prenhes no rebanho</th></tr></thead><tbody>
+      ${hist.map(({m, r}) => { const x = r.repro; return `<tr><td><b>${esc(ymLong(m))}</b></td><td>${brDate(x.data)}</td><td class="n">${isNum(x.delMed) ? fmt(x.delMed, 0) : "—"}</td><td class="n">${x.n}</td><td class="n">${x.cnt.pev}</td><td class="n">${x.cnt.aberta}</td><td class="n">${x.cnt.insem}</td><td class="n">${x.cnt.prenhe}</td><td class="n">${x.cnt.descarte}</td><td class="n">${isNum(x.pctPrenhe) ? fmt(x.pctPrenhe, 0) + "%" : "—"}</td></tr>`; }).join("") || `<tr><td colspan="10" class="note">O retrato de cada mês é registrado sozinho quando você lança ocorrências ou salva fichas no mês da visita, ou pelo botão "Registrar hoje".</td></tr>`}
+    </tbody></table></div></div>`;
+  mountCharts(defs);
+}
+/* números do rebanho a partir do cadastro */
+const HERD_K = ["vl", "vs", "pp", "nov", "bzf", "bzm"];
+function herdFromCad(list) {
+  const r = {vl: 0, vs: 0, pp: 0, nov: 0, bzf: 0, bzm: 0};
+  list.forEach(a => { if (a.cat === "vaca") { const x = repro(a); if (x.est === "Seca") { if (x.show === "Pré-parto") r.pp++; else r.vs++; } else r.vl++; }
+    else if (a.cat === "novilha") r.nov++; else if (a.cat === "bezerra") r.bzf++; else if (a.cat === "macho") r.bzm++; });
+  return r;
+}
+/* ícones do menu */
+const ICONS = {
+  painel: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+  sobre: '<path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>',
+  animais: '<path d="M4 12.5V5a1 1 0 0 1 1-1h7.5L20 11.5 12.5 19z"/><circle cx="8.5" cy="8.5" r="1.4"/>',
+  periodos: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  ocorrencias: '<path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><circle cx="12" cy="12" r="4.5"/>',
+  rotina: '<rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 12l2.5 2.5 4.5-5"/>',
+  cria: '<path d="M4 19l5.5-6 4 3.5L20 8"/><path d="M15 8h5v5"/>',
+  reproducao: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z"/>',
+  qualidade: '<path d="M12 3.5s6 6.6 6 10.7a6 6 0 0 1-12 0C6 10.1 12 3.5 12 3.5z"/>',
+  alimentacao: '<path d="M5 19c0-8 5.5-13 14-14-1 8.5-6 14-14 14z"/><path d="M5 19l7-7"/>',
+  controle: '<path d="M9 3.5h6M10 3.5v4l-3.5 4.5V19a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-7L14 7.5v-4"/><path d="M6.5 13.5h11"/>',
+  acoes: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  metas: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.8"/>',
+  historico: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  programa: '<path d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z"/><path d="M3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5"/>',
+  usuarios: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c.6-3.3 2.7-5 5.5-5s4.9 1.7 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.8c1.6.6 2.6 2.2 3 4.7"/>',
+  livro: '<path d="M4.5 5.5A2 2 0 0 1 6.5 3.5H19.5v14H6.5a2 2 0 0 0-2 2z"/><path d="M4.5 19.5a2 2 0 0 0 2 2h13v-4"/>'
+};
+const svgIcon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mi">${ICONS[k] || ""}</svg>`;
+document.querySelectorAll("#menu button[data-view]").forEach(b => { if (ICONS[b.dataset.view]) b.insertAdjacentHTML("afterbegin", svgIcon(b.dataset.view)); });
+[["#progBtn", "programa"], ["#livroBtn", "livro"]].forEach(([id, k]) => { const b = $(id); if (b) b.insertAdjacentHTML("afterbegin", svgIcon(k)); });
+content.addEventListener("click", async e => {
+  const t = e.target.closest("[data-fx],[data-fiid]"); if (!t) return;
+  if (t.dataset.fiid) { if (!(await leaveOk())) return; ensureForm(); const i = A.findIndex(a => normId(a.id) === normId(t.dataset.fiid)); if (i < 0) return; fichaIdx = i; S.view = "animais"; refreshSide(); render(); window.scrollTo(0, 0); return; }
+  const x = t.dataset.fx;
+  if (x === "savePev") { const v = toNum(($("#rpPev") || {}).value); if (!isNum(v) || v < 0 || v > 200) { toast("Digite o PEV em dias (ex.: 45)."); return; } const f = clone(farm()); f.pev = Math.round(v); if (await saveFarm(f)) { toast("PEV salvo: " + f.pev + " dias."); render(); } return; }
+  if (x === "snapRepro") { await snapRepro(); toast("Retrato de hoje registrado em " + ymLong(nowYm()) + "."); render(); return; }
+  if (x === "herdCad") { const h = herdFromCad(animList()); HERD_K.forEach(k => F.d[k] = h[k]); markRec(); render(); toast("Números do rebanho atualizados pelo cadastro. Clique em Salvar."); return; }
+});
 
 if (!window.RPDPL_APP) (function start() {
   refreshSide(); render();

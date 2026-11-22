@@ -2,7 +2,7 @@
    Carregado depois do código principal; troca o armazenamento do Claude pelo Firebase. */
 (function () {
 "use strict";
-const APP_VERSION = "4.1";
+const APP_VERSION = "4.2";
 const cfg = window.FIREBASE_CONFIG || {};
 const iso = () => new Date().toISOString();
 const ROLES = {pendente: "Aguardando aprovação", estagiario: "Estagiário", tecnico: "Técnico", admin: "Coordenação", bloqueado: "Bloqueado"};
@@ -258,7 +258,7 @@ function paintUser() {
   userBox.innerHTML = `<div><b title="${esc(ME.email || "")}">${esc(ME.nome || ME.email || "")}</b>${esc(ROLES[ME.role] || "")}</div><button type="button" id="logoutBtn">Sair</button>`;
   document.getElementById("logoutBtn").onclick = async () => { if (!(await leaveOk())) return; auth.signOut(); };
   const pend = S.users.filter(u => u.role === "pendente").length;
-  usersBtn.innerHTML = "Usuários" + (pend ? `<span class="badge">${pend}</span>` : "");
+  usersBtn.innerHTML = svgIcon("usuarios") + "Usuários" + (pend ? `<span class="badge">${pend}</span>` : "");
   document.body.classList.toggle("ro", ME.role === "tecnico");
 }
 refreshSide = function () {
