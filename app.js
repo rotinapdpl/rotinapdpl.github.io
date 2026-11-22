@@ -2,7 +2,7 @@
    Carregado depois do código principal; troca o armazenamento do Claude pelo Firebase. */
 (function () {
 "use strict";
-const APP_VERSION = "4.0.1";
+const APP_VERSION = "4.1";
 const cfg = window.FIREBASE_CONFIG || {};
 const iso = () => new Date().toISOString();
 const ROLES = {pendente: "Aguardando aprovação", estagiario: "Estagiário", tecnico: "Técnico", admin: "Coordenação", bloqueado: "Bloqueado"};
@@ -131,7 +131,7 @@ function stopData() {
   dataUnsubs.forEach(f => { try { f(); } catch (e) {} }); dataUnsubs = [];
   Object.values(farmSubs).forEach(x => x.u.forEach(f => { try { f(); } catch (e) {} })); farmSubs = {};
   if (usersUnsub) { usersUnsub(); usersUnsub = null; }
-  S.farms = {}; S.recs = {}; S.anims = {}; S.acoes = {}; S.livro = []; S.pub = {}; S.users = []; S.loaded = false;
+  S.farms = {}; S.recs = {}; S.anims = {}; S.acoes = {}; S.ocor = {}; S.livro = []; S.pub = {}; S.users = []; S.loaded = false;
   try { calcCache.clear(); } catch (e) {}
 }
 let renderQ = false;
@@ -140,7 +140,7 @@ function upd(force) {
   setStatus(navigator.onLine ? "cloud" : "local", navigator.onLine ? "Salvo na nuvem" : "Sem internet: salva quando voltar");
   refreshSide();
   if (renderQ) return; renderQ = true;
-  requestAnimationFrame(() => { renderQ = false; if (force || (!isDirty() && !["novo", "sobre", "metas", "usuarios"].includes(S.view))) render(); });
+  requestAnimationFrame(() => { renderQ = false; if (force || (!isDirty() && !["novo", "sobre", "metas", "usuarios", "ocorrencias", "periodos"].includes(S.view) && fichaIdx == null)) render(); });
 }
 const errH = () => { setStatus("local", "Erro ao carregar os dados"); };
 function startData() {
@@ -152,9 +152,9 @@ function startData() {
     let p2 = true, p3 = true;
     dataUnsubs.push(db.collection("farms").onSnapshot(s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.farms = o; if (p2) { p2 = false; part(); } else upd(); }, e => { errH(e); if (p2) { p2 = false; part(); } }));
     dataUnsubs.push(db.collectionGroup("data").onSnapshot(s => {
-      const r = {}, a = {}, c = {};
-      s.forEach(d => { const fid = d.ref.parent.parent.id, o = d.data(); if (d.id.startsWith("rec_")) r[recKey(fid, o.ym)] = o; else if (d.id === "anim") a[fid] = o.list || []; else if (d.id === "acoes") c[fid] = o.list || []; });
-      S.recs = r; S.anims = a; S.acoes = c; if (p3) { p3 = false; part(); } else upd();
+      const r = {}, a = {}, c = {}, oc = {};
+      s.forEach(d => { const fid = d.ref.parent.parent.id, o = d.data(); if (d.id.startsWith("rec_")) r[recKey(fid, o.ym)] = o; else if (d.id === "anim") a[fid] = o.list || []; else if (d.id === "acoes") c[fid] = o.list || []; else if (d.id === "ocor") oc[fid] = o.list || []; });
+      S.recs = r; S.anims = a; S.acoes = c; S.ocor = oc; if (p3) { p3 = false; part(); } else upd();
     }, e => { errH(e); if (p3) { p3 = false; part(); } }));
     dataUnsubs.push(db.collection("program").doc("livro").onSnapshot(d => { S.livro = (d.exists && d.data().list) || []; upd(); }, () => {}));
     if (isAdmin()) usersUnsub = db.collection("users").onSnapshot(s => { S.users = s.docs.map(d => Object.assign({uid: d.id}, d.data())); paintUser(); if (S.view === "usuarios") render(); }, () => {});
@@ -166,8 +166,8 @@ function subFarm(fid) {
   const fr = db.collection("farms").doc(fid);
   const u1 = fr.onSnapshot(d => { if (d.exists) S.farms[fid] = d.data(); else delete S.farms[fid]; a = true; chk(); upd(); }, () => { delete farmSubs[fid]; res(false); });
   const u2 = fr.collection("data").onSnapshot(s => {
-    Object.keys(S.recs).forEach(k => { if (k.startsWith(fid + "|")) delete S.recs[k]; }); delete S.anims[fid]; delete S.acoes[fid];
-    s.forEach(d => { const o = d.data(); if (d.id.startsWith("rec_")) S.recs[recKey(fid, o.ym)] = o; else if (d.id === "anim") S.anims[fid] = o.list || []; else if (d.id === "acoes") S.acoes[fid] = o.list || []; });
+    Object.keys(S.recs).forEach(k => { if (k.startsWith(fid + "|")) delete S.recs[k]; }); delete S.anims[fid]; delete S.acoes[fid]; delete S.ocor[fid];
+    s.forEach(d => { const o = d.data(); if (d.id.startsWith("rec_")) S.recs[recKey(fid, o.ym)] = o; else if (d.id === "anim") S.anims[fid] = o.list || []; else if (d.id === "acoes") S.acoes[fid] = o.list || []; else if (d.id === "ocor") S.ocor[fid] = o.list || []; });
     b = true; chk(); upd();
   }, () => { res(false); });
   farmSubs[fid] = {u: [u1, u2], ready}; return ready;
@@ -184,7 +184,7 @@ function commit(p) {
 function refOf(id) {
   if (id === "livro") return db.collection("program").doc("livro");
   let m = id.match(/^rec_(.+)_(\d{4}-\d{2})$/); if (m) return db.collection("farms").doc(m[1]).collection("data").doc("rec_" + m[2]);
-  m = id.match(/^(anim|acoes)_(.+)$/); if (m) return db.collection("farms").doc(m[2]).collection("data").doc(m[1]);
+  m = id.match(/^(anim|acoes|ocor)_(.+)$/); if (m) return db.collection("farms").doc(m[2]).collection("data").doc(m[1]);
   throw {code: "invalid_argument"};
 }
 async function writeFarm(f) {
