@@ -233,6 +233,18 @@ table.ctr th,table.ctr td{text-align:center}
 .est-prenhe{background:rgba(18,140,76,.14);color:#0d6b3a}.est-inseminada{background:rgba(31,155,181,.15);color:#13697b}.est-seca{background:rgba(124,92,196,.14);color:#5b3fa0}.est-prparto{background:rgba(235,104,52,.16);color:#a3441a}.est-descarte{background:rgba(179,38,30,.12);color:#8c1d17}
 svg.mi{width:18px;height:18px;flex:none;margin-right:10px;vertical-align:-4px;opacity:.88}
 .est-empev{background:rgba(154,163,181,.22);color:#4a5368}.est-aberta{background:rgba(235,104,52,.16);color:#a3441a}
+.sanbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0 8px}.sanbar select{height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+.sangrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;max-height:360px;overflow:auto;padding:2px}
+.sanit{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;font-size:14px;min-height:44px}
+.sanit span{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sanit.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.sanit input{width:18px;height:18px;flex:none}
+.prog{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:4px 0 12px}.prog span{display:block;height:100%;background:var(--good,#128c4c)}
+.rot{list-style:none;margin:0;padding:0}.rot li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14.5px}.rot li .btn{margin-left:auto}
+.rot .ck{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none}.rot li.ok .ck{background:#128c4c;border-color:#128c4c;color:#fff}
+.notas{list-style:none;margin:8px 0 0;padding:0}.notas li{padding:8px 0;border-bottom:1px solid var(--line);font-size:14.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notas li .rm{margin-left:auto}
+@media (max-width:760px){input,select,textarea{font-size:16px!important}.field input,.field select{min-height:46px}.btn{min-height:44px}.btn.sm{min-height:38px}
+  .fchip{min-height:38px}.chips{flex-wrap:nowrap!important;overflow-x:auto;padding-bottom:4px}.tbl-wrap td input{min-height:42px}.page-head{flex-wrap:wrap;gap:10px}.perchip{width:100%}
+  .sangrid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));max-height:50vh}.rowlink td{padding-top:12px;padding-bottom:12px}}
 </style>
 <meta name="theme-color" content="#0b2a4a">
 <link rel="manifest" href="manifest.webmanifest">
@@ -261,6 +273,7 @@ svg.mi{width:18px;height:18px;flex:none;margin-right:10px;vertical-align:-4px;op
       <button data-view="alimentacao">Alimentação</button>
       <button data-view="controle">Controle Leiteiro</button>
       <button data-view="acoes">Ações e combinados</button>
+      <button data-view="visita">Resumo da visita</button>
       <div class="sep"></div>
       <button data-view="metas">Metas</button>
       <button data-view="historico">Comparar meses</button>
@@ -276,7 +289,7 @@ svg.mi{width:18px;height:18px;flex:none;margin-right:10px;vertical-align:-4px;op
 <div id="pdfStage" aria-hidden="true"></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 <input type="file" id="laudoFile" accept=".pdf,.xlsx,.xls,.csv,.txt" hidden>
-<input type="file" id="csvFile" accept=".csv,.txt,text/csv,text/plain" hidden>
+<input type="file" id="csvFile" accept=".csv,.txt,.xlsx,.xls,text/csv,text/plain" hidden>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1038,7 +1051,7 @@ async function makePDF(btn) {
         defs.slice(0, 4).forEach((d, i) => chartBlock(d, mg + (i % 2) * (cw + 8), top + Math.floor(i / 2) * rowH, cw, ih));
       }
     }
-    const av = avisos(animsOf(S.farmId));
+    const av = avisosAll(animsOf(S.farmId));
     if (av.length) { newPage("Avisos do rebanho"); let yy = 44; const cx = [mg, mg + 70, mg + 190, mg + 230];
       const rowA = (cells, bold) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(bold ? 11 : 12); doc.setTextColor(bold ? 74 : 13, bold ? 83 : 21, bold ? 104 : 38); cells.forEach((t, i) => doc.text(pdfTxt(t), cx[i], yy)); doc.setDrawColor(223, 227, 234); doc.line(mg, yy + 2.6, W - mg, yy + 2.6); yy += 8.4; };
       rowA(["Animal", "Aviso", "Data", "Quando"], true);
@@ -1625,7 +1638,9 @@ function renderMetas(el) {
     <div class="fields">${Object.keys(METAS_PADRAO).map(k => `<div class="field"><label for="fm_${k}">${esc(METAS_PADRAO[k].t)} <small>— ${M[k].dir === "min" ? "mínimo" : "máximo"}</small></label><input type="text" inputmode="decimal" id="fm_${k}" value="${numIn(M[k].v)}"></div>`).join("")}</div></div>
     <div class="box"><h3>Parâmetros de cria e recria</h3><div class="fields">
       <div class="field"><label for="fp_pa">Peso adulto das vacas (kg)</label><input type="text" inputmode="decimal" id="fp_pa" value="${numIn(P.pa)}"></div>
-      <div class="field"><label for="fp_pc">Peso à puberdade (% do peso adulto)</label><input type="text" inputmode="decimal" id="fp_pc" value="${numIn(P.pc)}"></div></div></div>
+      <div class="field"><label for="fp_pc">Peso à puberdade (% do peso adulto)</label><input type="text" inputmode="decimal" id="fp_pc" value="${numIn(P.pc)}"></div>
+      <div class="field"><label for="fp_desal">Idade de desaleitamento (dias)</label><input type="text" inputmode="numeric" id="fp_desal" value="${farmDesal()}"></div>
+      <div class="field"><label for="fp_pev">PEV — Período de Espera Voluntário (dias)</label><input type="text" inputmode="numeric" id="fp_pev" value="${farmPev()}"></div></div></div>
     <div class="row-actions"><button class="btn primary" data-act2="saveMetas">Salvar metas</button><button class="btn" data-act2="resetMetas">Voltar aos valores padrão</button></div>`;
 }
 
@@ -1768,8 +1783,8 @@ function renderPrograma(el) {
       <div class="tile"><div class="t">Leite por dia (soma)</div><div class="v">${fmt(leite, 0)}<small>L/dia</small></div></div>
       <div class="tile"><div class="t">Vacas em lactação (soma)</div><div class="v">${fmt(vl, 0)}<small>cab</small></div></div>
       <div class="tile"><div class="t">Leite por vaca (média do programa)</div><div class="v">${fmt(div(leite, vl), 1)}<small>L/vaca/dia</small></div></div></div>
-    <div class="hist"><table><thead><tr><th>Fazenda</th><th>Mês</th>${PROG_COLS.map(k => `<th class="n"><button class="sortb" data-psort="${k}">${esc(INDK[k].t)}${progSort.k === k ? (progSort.dir < 0 ? " ▼" : " ▲") : ""}</button><br><small style="font-weight:400">${esc(INDK[k].u)}</small></th>`).join("")}</tr></thead>
-    <tbody>${sorted.map(r => `<tr><td><b>${esc(r.label)}</b></td><td>${r.locked ? `<button class="btn sm" data-punlock="${r.f.id}">Abrir (senha)</button>` : r.ym ? esc(ymLabel(r.ym)) : "—"}</td>${r.locked || !r.ym ? PROG_COLS.map(() => `<td class="n">—</td>`).join("") : PROG_COLS.map(k => cell(r, k)).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="hist"><table><thead><tr><th>Fazenda</th><th>Mês</th><th class="n">Roteiro</th>${PROG_COLS.map(k => `<th class="n"><button class="sortb" data-psort="${k}">${esc(INDK[k].t)}${progSort.k === k ? (progSort.dir < 0 ? " ▼" : " ▲") : ""}</button><br><small style="font-weight:400">${esc(INDK[k].u)}</small></th>`).join("")}</tr></thead>
+    <tbody>${sorted.map(r => `<tr><td><b>${esc(r.label)}</b></td><td>${r.locked ? `<button class="btn sm" data-punlock="${r.f.id}">Abrir (senha)</button>` : r.ym ? esc(ymLabel(r.ym)) : "—"}</td><td class="n">${r.ym && !r.locked ? (x => `<span class="${x.done === x.total ? "up-good" : ""}">${x.done}/${x.total}</span>`)(roteiro(r.f.id, r.ym)) : "—"}</td>${r.locked || !r.ym ? PROG_COLS.map(() => `<td class="n">—</td>`).join("") : PROG_COLS.map(k => cell(r, k)).join("")}</tr>`).join("")}</tbody></table></div>
     <p class="note" style="margin:-12px 0 18px">Verde: dentro da meta da própria fazenda · amarelo: fora da meta. Clique no nome da coluna para ordenar.</p>
     <div class="box"><div class="row-actions" style="margin:0 0 8px"><h3 style="margin-right:auto">Comparar fazendas</h3><label for="progInd" class="note">Indicador</label><select id="progInd">${PROG_COLS.map(k => `<option value="${k}"${progInd === k ? " selected" : ""}>${esc(INDK[k].t)}</option>`).join("")}</select></div>
     <div class="chart-box" style="height:${Math.max(220, ok.length * 34 + 60)}px"><canvas id="g_prog" role="img" aria-label="Comparação entre fazendas"></canvas></div></div>`;
@@ -1919,7 +1934,7 @@ async function onAct2(t) {
   }
   else if (a === "saveMetas" || a === "resetMetas") {
     const f = clone(farm()); const mt = {};
-    if (a === "saveMetas") { Object.keys(METAS_PADRAO).forEach(k => { const v = toNum($("#fm_" + k).value); if (isNum(v)) mt[k] = {v}; }); f.pesoAdulto = toNum($("#fp_pa").value); f.pctPub = toNum($("#fp_pc").value); }
+    if (a === "saveMetas") { Object.keys(METAS_PADRAO).forEach(k => { const v = toNum($("#fm_" + k).value); if (isNum(v)) mt[k] = {v}; }); f.pesoAdulto = toNum($("#fp_pa").value); f.pctPub = toNum($("#fp_pc").value); const dz = toNum($("#fp_desal").value), pz = toNum($("#fp_pev").value); if (isNum(dz)) f.desal = Math.round(dz); if (isNum(pz)) f.pev = Math.round(pz); }
     else { delete f.pesoAdulto; delete f.pctPub; }
     f.metas = mt; t.disabled = true; const ok = await saveFarm(f); t.disabled = false; if (ok) { calcCache.clear(); toast(a === "saveMetas" ? "Metas salvas." : "Metas voltaram ao padrão."); render(); }
   }
@@ -1954,7 +1969,7 @@ async function importBackup(file) {
 }
 
 /* ============ navegação ============ */
-const VIEWS = {acoes: renderAcoes, painel: renderPainel, rotina: renderRotina, alimentacao: renderAlim, cria: renderCria, qualidade: renderQual, controle: renderControle, animais: renderAnimais, metas: renderMetas, historico: renderHist, periodos: renderPeriodos, ocorrencias: renderOcor, reproducao: renderRepro};
+const VIEWS = {acoes: renderAcoes, painel: renderPainel, rotina: renderRotina, alimentacao: renderAlim, cria: renderCria, qualidade: renderQual, controle: renderControle, animais: renderAnimais, metas: renderMetas, historico: renderHist, periodos: renderPeriodos, ocorrencias: renderOcor, reproducao: renderRepro, visita: renderVisita};
 function refreshSide() {
   S.demo = S.loaded && Object.keys(S.farms).length === 0;
   const fs = farms(); if (S.farmId && !fs[S.farmId]) S.farmId = null;
@@ -2057,7 +2072,10 @@ content.addEventListener("click", async e => {
 $("#importFile").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) importBackup(f); });
 $("#laudoFile").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) onLaudoFile(f); });
 $("#csvFile").addEventListener("change", async e => { const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-  const txt = await f.text(); const lines = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(splitLine);
+  let lines;
+  if (/\.xlsx?$/i.test(f.name)) { try { await loadLib("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"); const wb = XLSX.read(await f.arrayBuffer(), {type: "array", cellDates: true});
+      lines = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, raw: false, dateNF: "dd/mm/yyyy", defval: ""}).map(r => r.map(c => String(c).trim())).filter(r => r.some(Boolean)); } catch (err) { toast("Não foi possível ler a planilha."); return; } }
+  else { const txt = await f.text(); lines = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(splitLine); }
   const r = importAnimals(lines); markAnim(); render(); toast(`${r.novos} animais novos, ${r.atual} atualizados. Clique em Salvar cadastro.`); });
 window.addEventListener("beforeunload", e => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
 const rerenderTheme = () => { if (!isDirty() && S.farmId) render(); };
@@ -2104,7 +2122,7 @@ function avisos(list) {
   return out.sort((x, y) => x.dias - y.dias);
 }
 function avisosHTML(list) {
-  const av = avisos(list); if (!av.length) return "";
+  const av = avisosAll(list); if (!av.length) return "";
   return `<div class="box"><h3>Avisos do rebanho</h3><div class="tbl-wrap"><table><thead><tr><th>Animal</th><th>Aviso</th><th>Data</th><th>Quando</th></tr></thead><tbody>
     ${av.map(x => `<tr><td><b>${esc(x.a.id)}</b>${x.a.nome ? " · " + esc(x.a.nome) : ""}</td><td>${esc(x.tipo)}</td><td>${brDate(x.data)}</td><td class="${x.dias < 0 ? "dt-late" : x.dias <= 15 ? "dt-soon" : ""}">${quando(x.dias)}</td></tr>`).join("")}</tbody></table></div>
     <p class="note" style="margin:8px 0 0">Parto previsto = última inseminação + ${GEST} dias. Secagem 60 dias e pré-parto 30 dias antes do parto.</p></div>`;
@@ -2136,14 +2154,14 @@ function renderAnimais(el) {
   if (fichaIdx != null && A[fichaIdx]) { renderFicha(el, fichaIdx); return; } fichaIdx = null;
   el.innerHTML = pageHead("Cadastro de animais", false, `<button class="btn" data-fx="pdfCad">Baixar cadastro (PDF)</button>`) + `
     <div class="box"><div class="row-actions" style="margin:0"><input type="search" id="anBusca" placeholder="Buscar brinco ou nome" value="${esc(anBusca)}" style="height:38px;min-width:220px;margin-right:auto" aria-label="Buscar animal">
-      <button class="btn sm primary" data-fx="newVaca">+ Vaca</button><button class="btn sm primary" data-fx="newJovem">+ Novilha ou bezerra</button><button class="btn sm" data-act="pasteOpen" data-target="an">Colar da planilha</button><button class="btn sm" data-act="anCsv">Importar arquivo CSV</button></div>
+      <button class="btn sm primary" data-fx="newVaca">+ Vaca</button><button class="btn sm primary" data-fx="newJovem">+ Novilha ou bezerra</button><button class="btn sm" data-act="pasteOpen" data-target="an">Colar da planilha</button><button class="btn sm" data-act="anCsv">Importar planilha (Excel ou CSV)</button></div>
       ${pasteBox("an", "brinco; categoria (vaca, novilha, bezerra ou macho); nascimento; peso ao nascer; lote; último parto; nome; última inseminação; estado; mãe", "503-A\tnovilha\t25/03/2025\t34\tR2\n111A\tvaca\t\t\t\t18/07/2026\tBrauna\t02/10/2026\tInseminada")}
       <p class="note" style="margin:8px 0 0">Clique num animal para abrir a ficha. As ocorrências (inseminação, parto, secagem…) atualizam as fichas sozinhas. Datas em <span class="dt-soon">laranja</span> vencem em até 15 dias; em <span class="dt-late">vermelho</span>, já passaram.</p>
       ${isDirty() ? saveBar("Salvar cadastro importado") : ""}</div>
     ${avisosHTML(A)}<div id="anTabs">${anTablesHTML()}</div>`;
 }
 function fichaHist(a) {
-  const id = normId(a.id); const oc = ocorOf(S.farmId).filter(o => normId(o.animal) === id || normId(o.cria) === id).sort((x, y) => (y.data || "").localeCompare(x.data || ""));
+  const id = normId(a.id); const oc = ocorOf(S.farmId).filter(o => normId(o.animal) === id || normId(o.cria) === id || (Array.isArray(o.animais) && o.animais.some(x => normId(x) === id))).sort((x, y) => (y.data || "").localeCompare(x.data || ""));
   const pes = [], lei = [];
   farmMonths().forEach(ym => { const r = recs()[recKey(S.farmId, ym)]; if (!r) return;
     const c = (r.cr && r.cr.rows || []).find(x => normId(x.id) === id && isNum(x.peso)); if (c) pes.push({data: r.cr.data || isoDate(midMonth(ym)), peso: c.peso, lote: c.lote});
@@ -2159,6 +2177,7 @@ function ocDesc(o) {
   if (o.tipo === "compra") { p.push(CAT_NOME[o.cat] || ""); if (o.origem) p.push("de " + o.origem); if (isNum(o.valor)) p.push(fmtR(o.valor)); }
   if (o.tipo === "venda") { if (o.motivo) p.push(o.motivo); if (o.dest) p.push("para " + o.dest); if (isNum(o.valor)) p.push(fmtR(o.valor)); }
   if (o.tipo === "morte" && o.causa) p.push(o.causa);
+  if (SAN[o.tipo]) { if (o.produto) p.push(o.produto); if (o.dose) p.push(o.dose); if (Array.isArray(o.animais) && o.animais.length > 1) p.push(o.animais.join(", ")); if (o.prox) p.push("próxima dose " + brDate(o.prox)); }
   if (o.obs) p.push(o.obs);
   return p.filter(Boolean).join(" · ");
 }
@@ -2217,17 +2236,18 @@ function renderOcor(el) {
   const doMes = L.filter(x => (x.data || "").startsWith(S.ym)); const cnt = {}; doMes.forEach(x => cnt[x.tipo] = (cnt[x.tipo] || 0) + 1);
   el.innerHTML = pageHead("Ocorrências", false) + `<datalist id="dlOc">${al.filter(elig).map(a => `<option value="${esc(a.id)}">${esc(a.nome || CAT_NOME[a.cat] || "")}</option>`).join("")}</datalist>
     <div class="box"><h3>Lançar ocorrência</h3><div class="chips" style="margin-bottom:12px">${Object.entries(OC_TIPOS).map(([k, v]) => `<button class="fchip" data-octipo="${k}" aria-pressed="${t === k}">${esc(v)}</button>`).join("")}</div>
-      <div class="fields" id="ocForm">${fl}</div>
-      <p class="note" style="margin:10px 0 0">${{ia: "Atualiza a última inseminação, o touro e o estado (Inseminada) na ficha, e calcula o parto previsto.", diag: "Prenhe confirma a gestação; Vazia volta o animal para Vazia (vaca) ou Novilha.", parto: "A novilha vira vaca, a lactação e o último parto se atualizam e a cria entra no cadastro com o brinco informado.", seca: "A vaca passa para Seca.", mast: "Fica no histórico da vaca e na contagem de casos do mês.", compra: "O animal entra no cadastro.", venda: "O animal sai do cadastro e fica registrado no histórico.", morte: "O animal sai do cadastro e fica registrado no histórico."}[t]}</p>
+      <div id="ocForm">${SAN[t] ? sanFormHTML(t) : `<div class="fields">${fl}</div>`}</div>
+      <p class="note" style="margin:10px 0 0">${{vacina: "Marque os animais (use os filtros de categoria e lote), coloque a data e a vacina. Fica no histórico de cada animal; com a próxima dose, o app avisa o reforço.", medic: "Marque os animais tratados, o medicamento e a dose. Fica no histórico de cada animal.", casco: "Marque os animais casqueados. Fica no histórico de cada animal.", ia: "Atualiza a última inseminação, o touro e o estado (Inseminada) na ficha, e calcula o parto previsto.", diag: "Prenhe confirma a gestação; Vazia volta o animal para Vazia (vaca) ou Novilha.", parto: "A novilha vira vaca, a lactação e o último parto se atualizam e a cria entra no cadastro com o brinco informado.", seca: "A vaca passa para Seca.", mast: "Fica no histórico da vaca e na contagem de casos do mês.", compra: "O animal entra no cadastro.", venda: "O animal sai do cadastro e fica registrado no histórico.", morte: "O animal sai do cadastro e fica registrado no histórico."}[t]}</p>
       <div class="row-actions"><button class="btn primary" data-fx="ocAdd">Lançar ${esc(OC_TIPOS[t].toLowerCase())}</button></div></div>
     <div class="box"><h3>Registro de ocorrências</h3>
       ${doMes.length ? `<p class="note" style="margin:-4px 0 10px">Em ${esc(ymLong(S.ym))}: ${Object.entries(cnt).map(([k, n]) => `${n} ${esc(OC_TIPOS[k].toLowerCase())}`).join(" · ")}</p>` : ""}
       <div class="chips" style="margin-bottom:10px">${[["todas", "Todas"], ...Object.entries(OC_TIPOS)].map(([k, v]) => `<button class="fchip" data-ocfil="${k}" aria-pressed="${ocFil === k}">${esc(v)}</button>`).join("")}</div>
       <div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Ocorrência</th><th>Animal</th><th>Detalhes</th><th></th></tr></thead><tbody>
-      ${Lf.map(o => `<tr><td>${brDate(o.data)}</td><td>${esc(OC_TIPOS[o.tipo] || o.tipo)}</td><td><b>${esc(o.animal || "")}</b>${o.nome ? " · " + esc(o.nome) : ""}</td><td class="note">${esc(ocDesc(o))}</td><td><button class="rm" data-ocrm="${o.id}" aria-label="Apagar registro">✕</button></td></tr>`).join("") || `<tr><td colspan="5" class="note">Nenhuma ocorrência lançada.</td></tr>`}
+      ${Lf.map(o => `<tr><td>${brDate(o.data)}</td><td>${esc(OC_TIPOS[o.tipo] || o.tipo)}</td><td>${Array.isArray(o.animais) ? `<b>${o.animais.length}</b> ${o.animais.length === 1 ? "animal" : "animais"}` : `<b>${esc(o.animal || "")}</b>${o.nome ? " · " + esc(o.nome) : ""}`}</td><td class="note">${esc(ocDesc(o))}</td><td><button class="rm" data-ocrm="${o.id}" aria-label="Apagar registro">✕</button></td></tr>`).join("") || `<tr><td colspan="5" class="note">Nenhuma ocorrência lançada.</td></tr>`}
       </tbody></table></div></div>`;
 }
 async function addOcor() {
+  if (SAN[ocTipo]) return addSan(ocTipo);
   if (guardDemo()) return;
   const v = id => { const e = document.getElementById(id); return e ? e.value.trim() : ""; };
   const t = ocTipo, data = v("oc_data"); if (!data) { toast("Coloque a data."); return; }
@@ -2271,7 +2291,7 @@ async function addOcor() {
 }
 
 /* ---- Períodos ---- */
-const MONTH_VIEWS = ["rotina", "cria", "qualidade", "alimentacao", "controle"];
+const MONTH_VIEWS = ["rotina", "cria", "qualidade", "alimentacao", "controle", "visita"];
 function renderPeriodos(el) {
   const ms = farmMonths().slice().reverse(); const last = farmMonths().slice(-1)[0];
   const sug = !last ? nowYm() : (last < nowYm() ? nowYm() : ymShift(last, 1));
@@ -2298,7 +2318,7 @@ async function criarPeriodo(ym) {
   if (await saveRec(r)) { S.ym = ym; F = null; toast("Período " + ymLong(ym) + " criado."); S.view = "rotina"; refreshSide(); render(); }
 }
 function renderGate(el) {
-  const titles = {rotina: "Rotina do mês", cria: "Cria e Recria", qualidade: "Qualidade do leite", alimentacao: "Alimentação", controle: "Controle Leiteiro"};
+  const titles = {visita: "Resumo da visita", rotina: "Rotina do mês", cria: "Cria e Recria", qualidade: "Qualidade do leite", alimentacao: "Alimentação", controle: "Controle Leiteiro"};
   el.innerHTML = pageHead(titles[S.view] || "") + `<div class="box"><h3>O período ${esc(ymLong(S.ym))} ainda não foi criado</h3><p class="note" style="margin:0 0 12px">Crie o período para liberar os lançamentos deste mês, ou escolha outro período.</p>
     <div class="row-actions" style="margin:0"><button class="btn primary" data-fx="perCriarCur">Criar ${esc(ymLong(S.ym))}</button><button class="btn" data-fx="goPer">Ver períodos</button></div></div>`;
 }
@@ -2333,7 +2353,7 @@ async function makeCadPDF(btn) {
   try {
     const f = farm(); const k = pdfKit("landscape", "Cadastro de animais", farmLabel(f) + (f.nome && f.produtor ? " · " + f.nome : "") + " — " + brDate(todayIso()));
     const Wt = lastWeights(S.farmId); const hoje = parseDate(todayIso());
-    const av = avisos(A);
+    const av = avisosAll(A);
     if (av.length) { k.title("Avisos do rebanho"); k.table([{h: "Animal", w: 2}, {h: "Aviso", w: 4}, {h: "Data", w: 1.4}, {h: "Quando", w: 1.4}], av.map(x => [x.a.id + (x.a.nome ? " · " + x.a.nome : ""), x.tipo, brDate(x.data), quando(x.dias)])); }
     const vac = A.filter(a => a.cat === "vaca").sort((x, y) => String(x.id).localeCompare(String(y.id), "pt", {numeric: true}));
     k.title("Vacas (" + vac.length + ")");
@@ -2491,6 +2511,7 @@ const ICONS = {
   metas: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.8"/>',
   historico: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   programa: '<path d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z"/><path d="M3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5"/>',
+  visita: '<path d="M21 3.5L10.5 14"/><path d="M21 3.5l-6.5 17-4-6.5-6.5-4z"/>',
   usuarios: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c.6-3.3 2.7-5 5.5-5s4.9 1.7 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.8c1.6.6 2.6 2.2 3 4.7"/>',
   livro: '<path d="M4.5 5.5A2 2 0 0 1 6.5 3.5H19.5v14H6.5a2 2 0 0 0-2 2z"/><path d="M4.5 19.5a2 2 0 0 0 2 2h13v-4"/>'
 };
@@ -2504,6 +2525,200 @@ content.addEventListener("click", async e => {
   if (x === "savePev") { const v = toNum(($("#rpPev") || {}).value); if (!isNum(v) || v < 0 || v > 200) { toast("Digite o PEV em dias (ex.: 45)."); return; } const f = clone(farm()); f.pev = Math.round(v); if (await saveFarm(f)) { toast("PEV salvo: " + f.pev + " dias."); render(); } return; }
   if (x === "snapRepro") { await snapRepro(); toast("Retrato de hoje registrado em " + ymLong(nowYm()) + "."); render(); return; }
   if (x === "herdCad") { const h = herdFromCad(animList()); HERD_K.forEach(k => F.d[k] = h[k]); markRec(); render(); toast("Números do rebanho atualizados pelo cadastro. Clique em Salvar."); return; }
+});
+
+/* ============ Sanidade, avisos da recria, roteiro e resumo da visita ============ */
+const SAN = {vacina: "Vacinação", medic: "Medicamento", casco: "Casqueamento"};
+Object.assign(OC_TIPOS, SAN);
+let ocSel = new Set(), ocSanCat = "todas", ocSanLote = "";
+const farmDesal = () => { const f = farm() || {}; return isNum(f.desal) ? f.desal : 60; };
+const ocAnimais = o => Array.isArray(o.animais) ? o.animais : o.animal ? [o.animal] : [];
+const temVacina = (fid, id, re) => ocorOf(fid).some(o => o.tipo === "vacina" && re.test(semAcento(o.produto || "")) && ocAnimais(o).some(x => normId(x) === normId(id)));
+// avisos da recria e da sanidade, somados aos de reprodução
+function avisosRecria(list, fid) {
+  const out = []; const f = farms()[fid] || farm() || {}; const Pp = farmParams(f).pp; const Wt = lastWeights(fid); const Mt = metas(f); const iaMeta = (Mt.crIA && Mt.crIA.v) || 15; const desal = isNum(f.desal) ? f.desal : 60;
+  list.forEach(a => {
+    if (!a.nasc || a.cat === "vaca") return; const idD = -daysTo(a.nasc); if (!(idD >= 0)) return;
+    if ((a.cat === "bezerra" || a.cat === "novilha") && idD >= 75 && idD <= 300 && !temVacina(fid, a.id, /bruc|b19|rb51/)) {
+      const lim = addDays(a.nasc, 240); const d = daysTo(lim);
+      out.push({a, tipo: d < 0 ? "Brucelose: passou dos 8 meses sem vacina registrada" : idD < 90 ? "Brucelose: vacinar a partir dos 3 meses" : "Vacinar contra brucelose (até 8 meses)", data: lim, dias: d}); }
+    if ((a.cat === "bezerra" || a.cat === "macho")) { const dd = daysTo(addDays(a.nasc, desal)); if (dd <= 10 && dd >= -7) out.push({a, tipo: "Desaleitar (" + desal + " dias de idade)", data: addDays(a.nasc, desal), dias: dd}); }
+    if ((a.cat === "novilha" || a.cat === "bezerra") && !["Inseminada", "Prenhe"].includes(a.estado || "")) {
+      const w = Wt[normId(a.id)]; const meses = idD / MES;
+      if (w && w.peso >= Pp) out.push({a, tipo: `Atingiu o peso para a 1ª IA (${fmt(w.peso, 0)} kg)`, data: w.data, dias: daysTo(w.data)});
+      else if (meses >= iaMeta) out.push({a, tipo: `Atrasada para a 1ª IA (${fmt(meses, 1)} meses${w ? ", " + fmt(w.peso, 0) + " kg" : ""})`, data: addDays(a.nasc, Math.round(iaMeta * MES)), dias: daysTo(addDays(a.nasc, Math.round(iaMeta * MES)))}); }
+  });
+  ocorOf(fid).filter(o => o.prox && (o.tipo === "vacina" || o.tipo === "medic")).forEach(o => {
+    const d = daysTo(o.prox); const depois = ocorOf(fid).some(x => x.tipo === o.tipo && norm(x.produto || "") === norm(o.produto || "") && (x.data || "") > (o.data || "") && x.id !== o.id);
+    if (!depois && d <= 7 && d >= -30) { const n = ocAnimais(o).length; out.push({a: {id: n + (n === 1 ? " animal" : " animais"), nome: ""}, tipo: (o.tipo === "vacina" ? "Reforço da vacina " : "Próxima dose de ") + (o.produto || ""), data: o.prox, dias: d}); }
+  });
+  return out;
+}
+const avisosAll = (list, fid = S.farmId) => avisos(list).concat(avisosRecria(list, fid)).sort((x, y) => x.dias - y.dias);
+
+/* ---- formulário de sanidade (marcar vários animais) ---- */
+function sanFormHTML(t) {
+  const al = animList(); const lotes = [...new Set(al.map(a => a.lote).filter(Boolean))].sort();
+  const vis = al.filter(a => (ocSanCat === "todas" || a.cat === ocSanCat) && (!ocSanLote || a.lote === ocSanLote)).sort((x, y) => String(x.id).localeCompare(String(y.id), "pt", {numeric: true}));
+  const f = (id, label, input) => `<div class="field"><label for="${id}">${label}</label>${input}</div>`;
+  const sug = {vacina: "Ex.: Brucelose B19, Aftosa, Clostridiose, Raiva", medic: "Ex.: Ivermectina 1%, Mastizone", casco: ""}[t];
+  return `<div class="fields">${f("oc_data", "Data", `<input type="date" id="oc_data" value="${todayIso()}">`)}
+      ${t !== "casco" ? f("oc_prod", t === "vacina" ? "Vacina" : "Medicamento", `<input type="text" id="oc_prod" list="dlProd" placeholder="${esc(sug)}" autocomplete="off">`) : ""}
+      ${t === "medic" ? f("oc_dose", "Dose e via", `<input type="text" id="oc_dose" placeholder="Ex.: 10 mL subcutâneo" autocomplete="off">`) : ""}
+      ${t !== "casco" ? f("oc_prox", "Próxima dose (opcional)", `<input type="date" id="oc_prox">`) : ""}
+      ${f("oc_obs", "Observação", `<input type="text" id="oc_obs" autocomplete="off">`)}</div>
+    <datalist id="dlProd">${[...new Set(ocorOf(S.farmId).filter(o => o.tipo === t && o.produto).map(o => o.produto))].map(p => `<option value="${esc(p)}">`).join("")}</datalist>
+    <div class="sanbar"><span class="note">Mostrar:</span>${[["todas", "Todos"], ["vaca", "Vacas"], ["novilha", "Novilhas"], ["bezerra", "Bezerras"], ["macho", "Bezerros"]].map(([k, v]) => `<button class="fchip" data-sancat="${k}" aria-pressed="${ocSanCat === k}">${v}</button>`).join("")}
+      ${lotes.length ? `<select id="sanLote" aria-label="Lote"><option value="">Todos os lotes</option>${lotes.map(l => `<option${l === ocSanLote ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>` : ""}
+      <button class="btn sm" data-fx="sanAll">Marcar todos</button><button class="btn sm" data-fx="sanNone">Desmarcar</button><b id="sanCount" style="margin-left:auto">${ocSel.size} marcado${ocSel.size === 1 ? "" : "s"}</b></div>
+    <div class="sangrid">${vis.map(a => `<label class="sanit${ocSel.has(a.id) ? " on" : ""}"><input type="checkbox" data-san="${esc(a.id)}" ${ocSel.has(a.id) ? "checked" : ""}><b>${esc(a.id)}</b><span>${esc(a.nome || CAT_NOME[a.cat] || "")}</span></label>`).join("") || `<p class="note">Nenhum animal neste filtro.</p>`}</div>`;
+}
+async function addSan(t) {
+  if (guardDemo()) return;
+  const v = id => { const e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  const data = v("oc_data"); if (!data) { toast("Coloque a data."); return; }
+  if (!ocSel.size) { toast("Marque os animais."); return; }
+  if (t !== "casco" && !v("oc_prod")) { toast(t === "vacina" ? "Digite a vacina." : "Digite o medicamento."); return; }
+  const o = {id: uid(), tipo: t, data, animais: [...ocSel], produto: v("oc_prod"), dose: v("oc_dose"), prox: v("oc_prox"), obs: v("oc_obs"), criadoEm: new Date().toISOString()};
+  Object.keys(o).forEach(k => { if (o[k] === "" || o[k] == null) delete o[k]; });
+  if (await saveOcor(S.farmId, ocorOf(S.farmId).concat([o]))) { toast(`${SAN[t]} lançad${t === "medic" ? "o" : "a"} para ${ocSel.size} ${ocSel.size === 1 ? "animal" : "animais"}.`); ocSel = new Set(); render(); }
+}
+
+/* ---- roteiro da visita ---- */
+function roteiro(fid, ym) {
+  const r = recs()[recKey(fid, ym)] || {}; const d = r.d || {};
+  const it = [
+    ["rotina", "Rotina do mês (rebanho e leite)", isNum(d.vl) && (isNum(d.leiteDia) || LEITE_K.some(k => isNum(d[k])))],
+    ["cria", "Pesagem de bezerras e novilhas", ((r.cr && r.cr.rows) || []).some(x => isNum(x.peso))],
+    ["qualidade", "Qualidade do leite (tanque, CMT ou CCS)", isNum(d.ccs) || isNum(d.cbt) || isNum(d.cmtVacas) || (r.pes || []).some(x => isNum(x.ccs))],
+    ["alimentacao", "Dietas conferidas na Alimentação", (r.lotes || []).some(l => (l.itens || []).length)],
+    ["ocorrencias", "Ocorrências do mês lançadas", ocorOf(fid).some(o => (o.data || "").startsWith(ym))],
+    ["acoes", "Combinados para a próxima visita", acoesOf(fid).some(x => x.tipo === "visita" && (x.criado || "").startsWith(ym))],
+    ["visita", "Registro da visita", !!(r.visita && (r.visita.notas || []).length)]];
+  const opc = [["controle", "Controle leiteiro (se a fazenda faz)", (r.pes || []).some(x => isNum(x.l))]];
+  return {it, opc, done: it.filter(x => x[2]).length, total: it.length};
+}
+const NOTA_TIPOS = ["Manejo realizado", "Recomendação técnica", "Recomendação gerencial", "Observação"];
+let notaTipo = NOTA_TIPOS[0];
+function renderVisita(el) {
+  ensureForm(); F.visita = F.visita || {notas: []}; if (!F.visita.data && S.ym === nowYm()) F.visita.data = todayIso();
+  const R = roteiro(S.farmId, S.ym); const fz = farm() || {};
+  const pend = acoesOf(S.farmId).filter(x => x.tipo === "visita" && !x.feito);
+  el.innerHTML = pageHead("Resumo da visita", true) + `
+    <div class="form-wrap"><div>
+    <div class="box"><h3>Roteiro da visita <span class="note" style="font-weight:400">· ${R.done} de ${R.total} feitos</span></h3>
+      <div class="prog"><span style="width:${Math.round(R.done / R.total * 100)}%"></span></div>
+      <ul class="rot">${R.it.concat(R.opc).map(([v, t, ok], i) => `<li class="${ok ? "ok" : ""}"><span class="ck">${ok ? "✓" : ""}</span>${esc(t)}${i >= R.total ? ' <span class="note">· opcional</span>' : ""}${ok ? "" : ` <button class="btn sm" data-gov="${v}">Abrir</button>`}</li>`).join("")}</ul></div>
+    <div class="box"><h3>Registro da visita</h3><p class="note" style="margin:-4px 0 10px">O que foi feito e conversado e não entra nas outras abas: animal mochado ou marcado, mudança de lote, recomendações…</p>
+      <div class="fields" style="max-width:420px"><div class="field"><label for="vdata">Data da visita</label><input type="date" id="vdata" value="${esc(F.visita.data || "")}"></div></div>
+      <div class="chips" style="margin:6px 0 8px">${NOTA_TIPOS.map(n => `<button class="fchip" data-ntipo="${esc(n)}" aria-pressed="${notaTipo === n}">${esc(n)}</button>`).join("")}</div>
+      <div class="acadd"><input type="text" id="vnota" placeholder="${notaTipo === "Manejo realizado" ? "Ex.: mochadas as bezerras 610A e 610B" : notaTipo === "Recomendação gerencial" ? "Ex.: anotar a produção diária do tanque" : "Ex.: trocar a cama do bezerreiro"}" aria-label="Novo registro"><button class="btn primary" data-fx="notaAdd">Adicionar</button></div>
+      <ul class="notas">${(F.visita.notas || []).map(n => `<li><span class="est">${esc(n.tipo)}</span> ${esc(n.texto)} <button class="rm" data-notarm="${n.id}" aria-label="Apagar">✕</button></li>`).join("") || `<li class="note">Nada registrado ainda.</li>`}</ul></div>
+    </div>
+    <aside class="preview"><h3>Enviar ao produtor</h3><p class="note" style="margin:0 0 12px">Um PDF leve com os números do mês, o que foi feito, os avisos do rebanho e os combinados. No celular, o botão abre direto o WhatsApp.</p>
+      <button class="btn primary" data-fx="resumoShare" style="width:100%;margin-bottom:8px">Enviar pelo WhatsApp</button><button class="btn" data-fx="resumoPdf" style="width:100%">Baixar PDF</button>
+      <h3 style="margin-top:18px">Combinados pendentes</h3>${pend.length ? `<ul class="notas">${pend.map(x => `<li>${esc(x.texto)}${x.resp ? ` <span class="note">· ${esc(x.resp)}</span>` : ""}</li>`).join("")}</ul>` : `<p class="note">Nenhum combinado pendente.</p>`}
+      <button class="btn sm" data-gov="acoes">Abrir Ações e combinados</button></aside></div>`;
+}
+async function saveVisita() { dirtyRec = true; const ok = await doSave(); if (ok) render(); return ok; }
+
+/* ---- PDF leve do resumo ---- */
+async function resumoBlob() {
+  const f = farm(); const c = liveDel(cm(S.ym)); const prevYm = farmMonths().filter(m => m < S.ym).pop(); const p = prevYm ? cm(prevYm) : null;
+  const vis = (rec() && rec().visita) || F.visita || {}; const dv = vis.data || todayIso();
+  const k = pdfKit("portrait", "Resumo da visita", farmLabel(f) + " — " + brDate(dv)); const d = k.doc;
+  const est = (f.estagiarios || []).map(e => e.nome || e).filter(Boolean); const tec = (f.tecnicos || []).filter(Boolean);
+  k.text(`${f.produtor || ""}${f.nome ? " · " + f.nome : ""}${f.municipio ? " · " + f.municipio : ""}. Visita de ${brDate(dv)} (período ${ymLong(S.ym)}).${est.length ? " Estagiários: " + est.join(", ") + "." : ""}${tec.length ? " Técnicos: " + tec.join(", ") + "." : ""}`, 9.5, [74, 83, 104]);
+  k.y += 2; k.title("Números do mês");
+  const st = reproStats(animsOf(S.farmId), farmPev(), todayIso());
+  const nums = [["Leite produzido", c.leiteDia, "L/dia", 0, "leiteDia"], ["Leite por vaca em lactação", c.lPorVL, "L/vaca/dia", 1, "lPorVL"], ["Vacas em lactação", c.vl, "vacas", 0, "vl"], ["Vacas em lactação no total de vacas", c.pctLact, "%", 0, "pctLact"],
+    ["CCS do tanque", c.ccs, "mil cél/mL", 0, "ccs"], ["CBT do tanque", c.cbt, "mil UFC/mL", 0, "cbt"], ["DEL médio (vacas em lactação)", c.del, "dias", 0, null], ["Vacas prenhes no rebanho", st.pctPrenhe, "%", 0, null]].filter(x => isNum(x[1]));
+  const half = Math.ceil(nums.length / 2);
+  for (let i = 0; i < half; i++) { k.need(12); [nums[i], nums[i + half]].forEach((x, j) => { if (!x) return; const X = k.mg + j * (k.tw / 2); const pv = x[4] && p ? p[x[4]] : null;
+    d.setFont("helvetica", "normal"); d.setFontSize(8.5); d.setTextColor(124, 132, 151); d.text(pdfTxt(x[0]), X, k.y);
+    d.setFont("helvetica", "bold"); d.setFontSize(12); d.setTextColor(13, 21, 38); const vs = fmt(x[1], x[3]) + " " + x[2]; d.text(pdfTxt(vs), X, k.y + 5.4);
+    if (isNum(pv)) { d.setFont("helvetica", "normal"); d.setFontSize(8.5); d.setTextColor(124, 132, 151); d.text(pdfTxt("mês anterior: " + fmt(pv, x[3])), X + d.getTextWidth(pdfTxt(vs)) * 12 / 8.5 * 0 + 52, k.y + 5.4); } }); k.y += 12.5; }
+  k.y += 2;
+  const feito = [];
+  (vis.notas || []).forEach(n => feito.push([n.tipo, n.texto]));
+  const r = rec() || {}; const nb = ((r.cr && r.cr.rows) || []).filter(x => isNum(x.peso)).length; if (nb) feito.push(["Pesagem", nb + " bezerras e novilhas pesadas"]);
+  if (isNum(r.d && r.d.cmtVacas)) feito.push(["CMT", r.d.cmtVacas + " vacas testadas"]);
+  const nc = (r.pes || []).filter(x => isNum(x.l)).length; if (nc) feito.push(["Controle leiteiro", nc + " vacas"]);
+  ocorOf(S.farmId).filter(o => (o.data || "").startsWith(S.ym)).sort((x, y) => (x.data || "").localeCompare(y.data || "")).forEach(o => { const n = ocAnimais(o).length;
+    feito.push([OC_TIPOS[o.tipo] || o.tipo, (SAN[o.tipo] ? (o.produto ? o.produto + " · " : "") + n + (n === 1 ? " animal" : " animais") : (o.animal || "") + (o.nome ? " " + o.nome : "") + (ocDesc(o) ? " · " + ocDesc(o) : "")) + " (" + brDate(o.data).slice(0, 5) + ")"]); });
+  k.title("O que foi feito");
+  if (feito.length) k.table([{h: "Tipo", w: 1.3}, {h: "Descrição", w: 4.2}], feito); else k.text("Nenhum registro neste período.");
+  const av = avisosAll(animsOf(S.farmId)).filter(x => x.dias <= 30).slice(0, 14);
+  if (av.length) { k.title("Avisos do rebanho"); k.table([{h: "Animal", w: 1.6}, {h: "Aviso", w: 3.2}, {h: "Data", w: 1}, {h: "Quando", w: 1}], av.map(x => [x.a.id + (x.a.nome ? " · " + x.a.nome : ""), x.tipo, brDate(x.data), quando(x.dias)])); }
+  const pend = acoesOf(S.farmId).filter(x => x.tipo === "visita" && !x.feito);
+  if (pend.length) { k.title("Combinados para a próxima visita"); k.table([{h: "O que fazer", w: 4}, {h: "Quem", w: 1.2}, {h: "Prazo", w: 1}], pend.map(x => [x.texto, x.resp || "", x.prazo ? brDate(x.prazo) : ""])); }
+  const name = safeName("Resumo da visita - " + farmLabel(f) + " - " + dv) + ".pdf";
+  return {blob: k.doc.output("blob"), name};
+}
+async function resumoGo(btn, share) {
+  if (!window.jspdf) { toast("A biblioteca do PDF não carregou. Recarregue a página."); return; }
+  btn.disabled = true; const lb = btn.textContent; btn.textContent = "Gerando…";
+  try { const {blob, name} = await resumoBlob();
+    let shared = false;
+    if (share) { try { const file = new File([blob], name, {type: "application/pdf"}); if (navigator.canShare && navigator.canShare({files: [file]})) { await navigator.share({files: [file], title: name, text: "Resumo da visita do PDPL"}); shared = true; } } catch (e) { if (e && e.name === "AbortError") shared = true; } }
+    if (!shared) { if (!downloads) toast("Para baixar o PDF, abra o app pelo Claude."); else { await saveFile(name, blob); if (share) toast("PDF baixado. No computador, anexe no WhatsApp Web; no celular, este botão abre o WhatsApp direto."); } }
+  } catch (e) { console.error(e); toast("Não foi possível gerar o PDF."); }
+  btn.disabled = false; btn.textContent = lb;
+}
+
+/* ---- leitura de planilhas pelo cabeçalho (FarmTell e outras) ---- */
+const HDR = [["id", /^(n[o°º]?\.?\s*)?(do\s*)?brinco|^animal$|^identifica|^n[o°º]\.?\s*animal|^numero$|^num\.?$/], ["nome", /^nome/], ["cat", /^categ|^tipo$/], ["nasc", /nasc/], ["pn", /^peso.*nasc|^p\.?\s*nasc/],
+  ["lote", /^lote/], ["parto", /(ult|ultimo|ultima|data|dt)\.?\s*(do\s*)?parto(?!.*prev)/], ["del", /^del$|dias\s*(em\s*)?lact|^dias\s*lac/], ["lac", /^(n[o°º]\.?\s*)?(de\s*)?lact|ordem.*parto|^n[o°º]\.?\s*partos?|^partos$/],
+  ["ultIA", /(ult|ultima|data|dt)\.?\s*(da\s*)?(ia|insem|cobert)|^ia$/], ["estado", /status|situa|^estado/], ["mae", /^m[aã]e/], ["touro", /touro|semen/], ["peso", /^peso(\s*atual)?$/]];
+const semAcento = x => norm(x).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function headerMap(row) { const m = {}; row.forEach((c, i) => { const h = semAcento(String(c || "")).replace(/[_:]/g, " ").trim(); if (!h) return; for (const [k, re] of HDR) { if (m[k] == null && re.test(h)) { m[k] = i; break; } } }); return m.id != null && Object.keys(m).length >= 2 ? m : null; }
+function estadoDe(txt, cat) { const e = semAcento(txt || ""); if (!e) return ""; if (/pren|gest/.test(e)) return "Prenhe"; if (/insem|serv|cobert/.test(e)) return "Inseminada"; if (/seca/.test(e)) return "Seca"; if (/descart/.test(e)) return "Descarte"; if (/vaz|abert|pev|lact|recem/.test(e)) return cat === "vaca" ? "Vazia" : "Novilha"; return ""; }
+function importByHeader(rows) {
+  let hi = -1, M = null; for (let i = 0; i < Math.min(rows.length, 12); i++) { const m = headerMap(rows[i]); if (m) { hi = i; M = m; break; } }
+  if (!M) return null;
+  let novos = 0, atual = 0; const hoje = parseDate(todayIso());
+  rows.slice(hi + 1).forEach(p => { const g = k => M[k] != null ? String(p[M[k]] ?? "").trim() : ""; const id = normId(g("id")); if (!id || /total|media/i.test(id)) return;
+    let a = A.find(x => normId(x.id) === id); if (a) atual++; else { a = {id, cat: "", nasc: "", pn: null, lote: "", parto: ""}; A.push(a); novos++; }
+    const cr = semAcento(g("cat")); const cat = cr.startsWith("vac") ? "vaca" : cr.startsWith("nov") ? "novilha" : cr.startsWith("bezerro") || cr.startsWith("mac") ? "macho" : cr.startsWith("bez") ? "bezerra" : "";
+    if (g("nome")) a.nome = g("nome"); if (dtIn(g("nasc"))) { a.nasc = dtIn(g("nasc")); a.nascEst = false; } if (isNum(toNum(g("pn")))) a.pn = toNum(g("pn")); if (g("lote")) a.lote = g("lote");
+    if (dtIn(g("parto"))) a.parto = dtIn(g("parto")); else if (isNum(toNum(g("del"))) && !a.parto) a.parto = isoDate(new Date(hoje.getTime() - toNum(g("del")) * 864e5));
+    if (isNum(toNum(g("lac")))) a.lac = toNum(g("lac")); if (dtIn(g("ultIA"))) a.ultIA = dtIn(g("ultIA")); if (g("mae")) a.mae = normId(g("mae")); if (g("touro")) a.touro = g("touro");
+    a.cat = cat || a.cat || ((isNum(a.lac) && a.lac > 0) || a.parto ? "vaca" : a.nasc && -daysTo(a.nasc) / MES >= 12 ? "novilha" : "bezerra");
+    const e = estadoDe(g("estado"), a.cat); if (e) a.estado = e;
+    if (!a.nasc && nascFromBrinco(a.id)) { a.nasc = nascFromBrinco(a.id); a.nascEst = true; } });
+  return {novos, atual, cols: Object.keys(M)};
+}
+const _impAn = importAnimals;
+importAnimals = function (rows) { const r = importByHeader(rows); return r || _impAn(rows); };
+
+/* ---- eventos ---- */
+content.addEventListener("click", async e => {
+  const t = e.target.closest("[data-sancat],[data-gov],[data-ntipo],[data-notarm],[data-fx]"); if (!t) return;
+  if (t.dataset.sancat) { ocSanCat = t.dataset.sancat; render(); return; }
+  if (t.dataset.gov) { go(t.dataset.gov); return; }
+  if (t.dataset.ntipo) { notaTipo = t.dataset.ntipo; const v = ($("#vnota") || {}).value || ""; render(); const n = $("#vnota"); if (n) { n.value = v; n.focus(); } return; }
+  if (t.dataset.notarm) { F.visita.notas = (F.visita.notas || []).filter(n => n.id !== t.dataset.notarm); await saveVisita(); return; }
+  const x = t.dataset.fx;
+  if (x === "sanAll") { document.querySelectorAll("[data-san]").forEach(c => ocSel.add(c.dataset.san)); render(); return; }
+  if (x === "sanNone") { ocSel = new Set(); render(); return; }
+  if (x === "notaAdd") { const txt = ($("#vnota") || {}).value.trim(); if (!txt) { $("#vnota").focus(); return; } F.visita.notas = (F.visita.notas || []).concat([{id: uid(), tipo: notaTipo, texto: txt}]);
+    if (await saveVisita()) { const n = $("#vnota"); if (n) n.focus(); } return; }
+  if (x === "resumoPdf") { resumoGo(t, false); return; }
+  if (x === "resumoShare") { resumoGo(t, true); return; }
+});
+content.addEventListener("change", async e => { const t = e.target;
+  if (t.dataset.san != null) { if (t.checked) ocSel.add(t.dataset.san); else ocSel.delete(t.dataset.san); t.closest(".sanit").classList.toggle("on", t.checked); const c = $("#sanCount"); if (c) c.textContent = ocSel.size + " marcado" + (ocSel.size === 1 ? "" : "s"); return; }
+  if (t.id === "sanLote") { ocSanLote = t.value; render(); return; }
+  if (t.id === "vdata") { F.visita = F.visita || {notas: []}; F.visita.data = t.value; await saveVisita(); return; } });
+// Enter: no formulário de ocorrência lança; nas tabelas desce para a próxima linha
+content.addEventListener("keydown", e => {
+  if (e.key !== "Enter" || e.shiftKey || !(e.target instanceof HTMLInputElement)) return;
+  const t = e.target;
+  if (t.id === "vnota") { e.preventDefault(); const b = document.querySelector('[data-fx="notaAdd"]'); if (b) b.click(); return; }
+  if (t.closest("#ocForm")) { e.preventDefault(); const b = document.querySelector('[data-fx="ocAdd"]'); if (b) b.click(); return; }
+  const td = t.closest("td"), tr = t.closest("tr"); if (!td || !tr) return;
+  const col = [...tr.children].indexOf(td); let nx = tr.nextElementSibling;
+  while (nx) { const c = nx.children[col]; const inp = c && c.querySelector("input:not([type=checkbox]):not([readonly])"); if (inp) { e.preventDefault(); inp.focus(); inp.select && inp.select(); return; } nx = nx.nextElementSibling; }
 });
 
 if (!window.RPDPL_APP) (function start() {
