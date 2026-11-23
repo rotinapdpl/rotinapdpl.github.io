@@ -1149,7 +1149,18 @@ function ensureForm() {
     if (isNum(F.d.prodTotal) && !isNum(F.d.leiteDia)) F.d.leiteDia = Math.round(F.d.prodTotal / (F.d.dias || daysIn(F.ym)));
     dirtyRec = false;
   }
-  if (!A || A._fid !== S.farmId) { A = clone(animsOf(S.farmId)); A._fid = S.farmId; dirtyAnim = false; }
+  if (!A || A._fid !== S.farmId) { A = clone(animsOf(S.farmId)); A._fid = S.farmId; dirtyAnim = false; fixBullNames(); }
+}
+/* nome de touro lido como nome do animal (importação antiga do FarmTell): limpa e, se der, salva sozinho */
+function bullSet(list) { const b = new Set(); const add = v => { const k = semAcento(v || "").trim(); if (k) b.add(k); };
+  list.forEach(a => { add(a.touro); add(a.pai); }); (S.farmId ? ocorOf(S.farmId) : []).forEach(o => add(o.touro)); return b; }
+function fixBullNames() {
+  if (!A || !A.length) return 0; const bulls = bullSet(A); let n = 0;
+  A.forEach(a => { if (!a.nome) return; const k = semAcento(a.nome).trim(); const own = [a.touro, a.pai].some(x => x && semAcento(x).trim() === k);
+    if (own || (a.cat !== "vaca" && bulls.has(k))) { if (!a.touro && !own && (a.ultIA || a.estado === "Prenhe" || a.estado === "Inseminada")) a.touro = a.nome; a.nome = ""; n++; } });
+  if (n && !S.demo) { const ok = typeof canEdit === "function" ? canEdit() && !(typeof isLocked === "function" && isLocked(farm())) : true;
+    if (ok) setTimeout(async () => { try { if (!dirtyAnim && !dirtyRec) { dirtyAnim = true; await doSave(); } } catch (e) {} }, 400); }
+  return n;
 }
 const animList = () => A ? Array.from(A) : animsOf(S.farmId);
 function calcF() { return calc(F, animList(), farm()); }
@@ -2888,6 +2899,7 @@ function importByHeader(rows) {
     const sw = m0[3] + "/" + m0[1] + "/" + m0[4]; const us = US[k] === "us" || (US[k] === "?" && gUS);
     let out = us ? sw : v; const d1 = dtIn(out); if (d1 && d1 > lim && +m0[1] <= 12 && +m0[3] <= 12) { const alt = out === v ? sw : v; const d2 = dtIn(alt); if (d2 && d2 <= lim) out = alt; }
     return out; };
+  const BULLS = bullSet(A); if (M.touro != null || M.pai != null) body.forEach(p => [M.touro, M.pai].forEach(c => { if (c != null) { const v = semAcento(String(p[c] ?? "")).trim(); if (v) BULLS.add(v); } }));
   body.forEach(p => { const g0 = k => M[k] != null ? String(p[M[k]] ?? "").trim() : ""; const g = k => ["nasc", "parto", "ultIA", "pesoData"].includes(k) ? fixD(k, g0(k)) : g0(k); const id = normId(g("id")); if (!id || /total|media/i.test(id)) return;
     let a = A.find(x => normId(x.id) === id); if (a) atual++; else { a = {id, cat: "", nasc: "", pn: null, lote: "", parto: ""}; A.push(a); novos++; }
     const cr = semAcento(g("cat")); const cat = cr.startsWith("vac") ? "vaca" : cr.startsWith("nov") ? "novilha" : cr.startsWith("bezerro") || cr.startsWith("mac") ? "macho" : cr.startsWith("bez") ? "bezerra" : "";
@@ -2896,6 +2908,7 @@ function importByHeader(rows) {
     if (isNum(toNum(g("lac")))) a.lac = toNum(g("lac")); if (dtIn(g("ultIA"))) a.ultIA = dtIn(g("ultIA")); if (g("mae")) { const mv = g("mae"); const bi = A.find(x => normId(x.id) === normId(mv)); const bn = A.find(x => x.nome && semAcento(x.nome) === semAcento(mv)); a.mae = bi ? bi.id : bn ? bn.id : mv; }
     if (g("touro")) a.touro = g("touro"); if (g("pai")) a.pai = g("pai");
     if (a.nome && [a.touro, a.pai].some(x => x && semAcento(x) === semAcento(a.nome))) a.nome = "";
+    if (a.nome && M.nome == null && a.cat !== "vaca" && cat !== "vaca" && BULLS.has(semAcento(a.nome).trim())) a.nome = "";
     if (isNum(toNum(g("peso")))) { a.ultPeso = toNum(g("peso")); a.ultPesoData = dtIn(g("pesoData")) || todayIso(); }
     a.cat = cat || a.cat || ((isNum(a.lac) && a.lac > 0) || a.parto ? "vaca" : a.nasc && -daysTo(a.nasc) / MES >= 12 ? "novilha" : "bezerra");
     const e = estadoDe(g("estado"), a.cat); if (e && !(e === "Novilha" && a.cat !== "novilha")) a.estado = e;
