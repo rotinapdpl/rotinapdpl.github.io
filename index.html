@@ -300,6 +300,15 @@ input::-webkit-date-and-time-value{text-align:left}
  .chips .fchip,.subtabs .fchip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:10px;font-size:13.5px;min-height:40px;padding:0 10px;width:100%;display:flex;align-items:center;justify-content:center;line-height:1.15}
  input,select,textarea{max-width:100%;box-sizing:border-box}
 }
+
+/* v4.9: nada passa da largura da tela no celular */
+@media (max-width:820px){
+ .form-wrap,.grid,.cols2,.two{grid-template-columns:minmax(0,1fr)!important}
+ .form-wrap>*,.grid>*,.box,.preview,.content{min-width:0;max-width:100%}
+ .box li,.preview li{min-width:0;flex-wrap:wrap}
+ .box h3,.preview h3{overflow-wrap:anywhere}
+ html,body{overflow-x:clip;max-width:100%}
+}
 </style>
 <meta name="theme-color" content="#0b2a4a">
 <link rel="manifest" href="manifest.webmanifest">

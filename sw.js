@@ -1,6 +1,6 @@
 // Rotina PDPL — funciona sem internet e avisa quando há versão nova.
 // Ao publicar uma versão nova, mude o número abaixo.
-const VERSAO = "rotina-pdpl-4.8";
+const VERSAO = "rotina-pdpl-4.9";
 const APP = ["./", "./index.html", "./app.js", "./firebase-config.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 const CDN = /(cdnjs\.cloudflare\.com|www\.gstatic\.com\/firebasejs)/;
 
