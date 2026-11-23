@@ -260,6 +260,36 @@ svg.mi{width:18px;height:18px;flex:none;margin-right:10px;vertical-align:-4px;op
 .avtx{min-width:0}.avtx span{color:var(--muted);font-size:13px}.avt{font-size:13.5px;color:var(--ink2);margin-top:2px}
 .avd{text-align:right;font-size:13px;white-space:nowrap}.avd small{display:block;color:var(--muted)}.avcol li.late .avd small{color:#b3261e;font-weight:600}.avcol li.soon .avd small{color:#b35c00;font-weight:600}
 .avok{margin:0;padding:16px 14px;color:var(--muted);font-size:13.5px}
+#mBtn,.bnav{display:none}
+@media (max-width:820px){
+  .side{position:sticky;top:0;z-index:40;padding:8px 12px 10px;display:grid!important;grid-template-columns:1fr auto;grid-template-areas:"logo btn" "farm farm";align-items:center;gap:8px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+  .side>*{display:none!important}#mBtn{grid-area:btn}.side>.farmblk{grid-area:farm}
+  .side>.logo{grid-area:logo;display:flex!important;min-width:0;padding:0!important;margin:0!important;align-items:center;gap:8px}.side .logo img{height:30px;width:auto;max-width:none}.side .logo-sub{display:none}.side .logo-name{font-size:16px}
+  .side>.farmblk{display:block!important;padding:0!important}.farmblk label{display:none}.farmblk select{height:40px!important;min-height:40px!important}
+  #mBtn{display:inline-flex!important;align-items:center;justify-content:center;width:42px;height:42px;border-radius:10px;border:1px solid var(--navy-line);background:transparent;color:#fff;font-size:22px;cursor:pointer;flex:none}
+  body.mopen{overflow:hidden}
+  body.mopen .side{position:fixed;inset:0;overflow:auto;display:block!important;padding:12px 0 90px;box-shadow:none}
+  body.mopen #mBtn{position:absolute;top:10px;right:12px}
+  body.mopen .side>*{display:block!important}body.mopen .side>.logo{display:flex!important;padding:0 16px 10px}
+  body.mopen .side>[hidden],body.mopen .side [hidden]{display:none!important}
+  body.mopen .side>.farmblk{padding:8px 16px!important}body.mopen .side>.logo{padding:0 70px 10px 16px!important}
+  body.mopen .menu{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;overflow:visible;padding:6px 0}
+  body.mopen .menu button{width:100%;white-space:normal;border-bottom:0;border-left:3px solid transparent;padding:12px 18px;text-align:left}
+  body.mopen .menu button[aria-current="page"]{border-left-color:var(--brand)}
+  body.mopen .menu .sep{display:block}
+  .content{padding:16px 14px 96px}
+  .bnav:not([hidden]){display:flex;position:fixed;left:0;right:0;bottom:0;z-index:45;background:var(--navy);border-top:1px solid var(--navy-line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  .bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;color:var(--on-navy-2,#b9c6d8);font:inherit;font-size:11px;padding:6px 2px;border-radius:10px;cursor:pointer;min-width:0}
+  .bnav button svg.mi{margin:0;width:22px;height:22px}.bnav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .bnav button[aria-current="page"]{color:#fff;background:rgba(255,255,255,.1)}
+  .tiles{grid-template-columns:1fr 1fr;gap:8px}.tile{padding:10px 11px}.tile .v{font-size:22px}.tile .t{font-size:12.5px}
+  .savebar{position:sticky;bottom:78px;z-index:30;background:var(--surface);padding:10px;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.15)}
+  .tv th:nth-child(4),.tv td:nth-child(4),.tv th:nth-child(5),.tv td:nth-child(5),.tv th:nth-child(7),.tv td:nth-child(7),.tv th:nth-child(9),.tv td:nth-child(9),.tv th:nth-child(10),.tv td:nth-child(10),.tv th:nth-child(11),.tv td:nth-child(11){display:none}
+  .tj th:nth-child(4),.tj td:nth-child(4),.tj th:nth-child(7),.tj td:nth-child(7),.tj th:nth-child(9),.tj td:nth-child(9),.tj th:nth-child(10),.tj td:nth-child(10),.tj th:nth-child(11),.tj td:nth-child(11){display:none}
+  .tv td,.tj td{padding-top:10px!important;padding-bottom:10px!important}
+  .page-head h1{font-size:24px}
+  .upd{bottom:84px}
+}
 </style>
 <meta name="theme-color" content="#0b2a4a">
 <link rel="manifest" href="manifest.webmanifest">
@@ -273,7 +303,7 @@ svg.mi{width:18px;height:18px;flex:none;margin-right:10px;vertical-align:-4px;op
   <aside class="side">
     <div class="logo"><img id="logoImg" alt=""><div><div class="logo-name">Rotina PDPL</div><div class="logo-sub">GESTÃO À VISTA</div></div></div>
     <div class="side-block" style="padding-bottom:0;display:flex;flex-direction:column;gap:6px"><button class="progbtn" id="progBtn" hidden>Visão do programa</button><button class="progbtn" id="livroBtn" hidden>Livro dos estagiários</button></div>
-    <div class="side-block"><label for="farmSel">Produtor</label><select id="farmSel"></select></div>
+    <div class="side-block farmblk"><label for="farmSel">Produtor</label><select id="farmSel"></select></div>
     <nav class="menu" id="menu" hidden aria-label="Seções do produtor">
       <button data-view="painel">Painel</button>
       <button data-view="sobre">Sobre a fazenda</button>
@@ -297,6 +327,7 @@ svg.mi{width:18px;height:18px;flex:none;margin-right:10px;vertical-align:-4px;op
     <div class="ver" title="Versão do app">Rotina PDPL v3.9</div>
   </aside>
   <main class="content" id="content"></main>
+  <nav class="bnav" id="bnav" hidden aria-label="Atalhos"></nav>
 </div>
 <div class="modal" id="modal" role="dialog" aria-modal="true"><div class="modal-box"><p id="modalMsg"></p><div id="modalPin" hidden style="margin:-4px 0 14px"><input type="password" id="pinIn" autocomplete="off" style="width:100%;height:40px;font-size:16px" aria-label="Senha da fazenda"><label class="check" style="height:auto;margin-top:8px"><input type="checkbox" id="pinRem"> Lembrar neste aparelho</label></div>
   <div class="row-actions"><button class="btn" id="modalNo">Cancelar</button><button class="btn danger" id="modalAlt" hidden>Sair sem salvar</button><button class="btn primary" id="modalYes">Confirmar</button></div></div></div>
@@ -2175,9 +2206,9 @@ function anTablesHTML() {
   const lotes = [...new Set(A.map(a => a.lote).filter(Boolean))].sort();
   const bulk = anSel.size ? `<div class="bulk"><b>${anSel.size} selecionado${anSel.size === 1 ? "" : "s"}</b><input type="text" id="bulkLote" list="dlLotes" placeholder="Novo lote" aria-label="Novo lote"><datalist id="dlLotes">${lotes.map(l => `<option value="${esc(l)}">`).join("")}</datalist>
     <button class="btn sm" data-fx="bulkLote">Mudar lote</button><button class="btn sm danger" data-fx="bulkDel">Excluir selecionados</button><button class="btn sm" data-fx="bulkClear">Limpar seleção</button></div>` : "";
-  return bulk + `<div class="box"><h3>Vacas <span class="note" style="font-weight:400">· ${vac.length}</span></h3><div class="tbl-wrap"><table><thead><tr>${hcb("vaca", vac)}<th>Brinco</th><th>Nome</th><th class="n">Lac.</th><th>Último parto</th><th class="n">DEL</th><th>Última inseminação</th><th>Estado</th><th>Parto previsto</th><th>Secagem prevista</th><th>Entrada no pré-parto</th></tr></thead>
+  return bulk + `<div class="box"><h3>Vacas <span class="note" style="font-weight:400">· ${vac.length}</span></h3><div class="tbl-wrap"><table class="tv"><thead><tr>${hcb("vaca", vac)}<th>Brinco</th><th>Nome</th><th class="n">Lac.</th><th>Último parto</th><th class="n">DEL</th><th>Última inseminação</th><th>Estado</th><th>Parto previsto</th><th>Secagem prevista</th><th>Entrada no pré-parto</th></tr></thead>
     <tbody>${vRows || `<tr><td colspan="11" class="note">Nenhuma vaca${q ? " encontrada" : " cadastrada"}.</td></tr>`}</tbody></table></div></div>
-    <div class="box"><h3>Novilhas <span class="note" style="font-weight:400">· ${jov.length}</span></h3><div class="tbl-wrap"><table><thead><tr>${hcb("jov", jov)}<th>Brinco</th><th>Nome</th><th>Nascimento</th><th class="n">Idade (meses)</th><th>Estado</th><th>Mãe</th><th class="n">Peso (kg)</th><th>Última pesagem</th><th>Lote</th><th>Parto previsto</th></tr></thead>
+    <div class="box"><h3>Novilhas <span class="note" style="font-weight:400">· ${jov.length}</span></h3><div class="tbl-wrap"><table class="tj"><thead><tr>${hcb("jov", jov)}<th>Brinco</th><th>Nome</th><th>Nascimento</th><th class="n">Idade (meses)</th><th>Estado</th><th>Mãe</th><th class="n">Peso (kg)</th><th>Última pesagem</th><th>Lote</th><th>Parto previsto</th></tr></thead>
     <tbody>${jRows || `<tr><td colspan="11" class="note">Nenhuma novilha${q ? " encontrada" : " cadastrada"}.</td></tr>`}</tbody></table></div></div>`;
 }
 function renderAnimais(el) {
@@ -2369,13 +2400,16 @@ function pdfKit(orient, titulo, subtitulo) {
   k.title = t => { k.need(16); doc.setTextColor(...NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(pdfTxt(t), mg, k.y); doc.setDrawColor(...NAVY); doc.setLineWidth(0.5); doc.line(mg, k.y + 2, W - mg, k.y + 2); doc.setLineWidth(0.2); k.y += 8; };
   k.text = (t, size = 9.5, color = MUT) => { doc.setFont("helvetica", "normal"); doc.setFontSize(size); doc.setTextColor(...color); const ls = doc.splitTextToSize(pdfTxt(t), tw); k.need(ls.length * 4.6 + 2); doc.text(ls, mg, k.y); k.y += ls.length * 4.6 + 2; };
   k.table = (cols, rows) => { const tot = cols.reduce((s, c0) => s + c0.w, 0); const ws = cols.map(c0 => c0.w / tot * tw); const rh = 6.8;
-    const row = (cells, head) => { doc.setFont("helvetica", head ? "bold" : "normal"); doc.setFontSize(head ? 8.6 : 9.2);
+    const row = (cells, head, op) => { op = op || {}; doc.setFont("helvetica", head ? "bold" : "normal"); doc.setFontSize(head ? 8.6 : 9.2);
       const lines = cells.map((t, i) => doc.splitTextToSize(pdfTxt(t ?? ""), ws[i] - 2.4).slice(0, head ? 2 : 1)); const h = head ? Math.max(...lines.map(l => l.length)) * 3.8 + 3.2 : rh;
-      k.need(h + (head ? rh : 0)); if (head) { doc.setFillColor(...FILL); doc.rect(mg, k.y, tw, h, "F"); }
-      doc.setTextColor(...(head ? [74, 83, 104] : INK)); let x = mg;
-      lines.forEach((ls, i) => { if (cols[i].r) doc.text(ls, x + ws[i] - 1.2, k.y + 4.6, {align: "right"}); else doc.text(ls, x + 1.2, k.y + 4.6); x += ws[i]; });
+      k.need(h + (head ? rh : 0)); if (head) { doc.setFillColor(...FILL); doc.rect(mg, k.y, tw, h, "F"); } else if (op.fill) { doc.setFillColor(...op.fill); doc.rect(mg, k.y, tw, h, "F"); }
+      let x = mg;
+      lines.forEach((ls, i) => { const cc = op.cc && op.cc[i];
+        if (cc && cc.bg) { doc.setFillColor(...cc.bg); doc.roundedRect(x + 0.8, k.y + 1, ws[i] - 1.6, h - 2, 1.2, 1.2, "F"); }
+        doc.setFont("helvetica", head || (cc && cc.bold) ? "bold" : "normal"); doc.setTextColor(...(head ? [74, 83, 104] : cc && cc.c ? cc.c : INK));
+        if (cols[i].r) doc.text(ls, x + ws[i] - 1.2, k.y + 4.6, {align: "right"}); else doc.text(ls, x + 1.2 + (cc && cc.bg ? 1 : 0), k.y + 4.6); x += ws[i]; });
       doc.setDrawColor(...LINE); doc.line(mg, k.y + h, mg + tw, k.y + h); k.y += h; };
-    row(cols.map(c0 => c0.h), true); rows.forEach(r => { if (k.y + rh > H - 14) { k.header(); row(cols.map(c0 => c0.h), true); } row(r, false); }); k.y += 5; };
+    row(cols.map(c0 => c0.h), true); rows.forEach(r => { if (k.y + rh > H - 14) { k.header(); row(cols.map(c0 => c0.h), true); } if (Array.isArray(r)) row(r, false); else row(r.c, false, r); }); k.y += 5; };
   k.header(); return k;
 }
 async function makeCadPDF(btn) {
@@ -2673,22 +2707,24 @@ async function resumoBlob() {
   if (est.length || tec.length) { d.setFont("helvetica", "normal"); d.setFontSize(9.5); d.setTextColor(74, 83, 104);
     if (est.length) { d.text(pdfTxt("Estagiários: " + est.join(", ")), k.mg, k.y); k.y += 5; } if (tec.length) { d.text(pdfTxt("Técnicos responsáveis: " + tec.join(", ")), k.mg, k.y); k.y += 5; } k.y += 3; }
   // números do mês, em cartões coloridos pela meta
-  k.title("Números do mês");
+  k.y += 4; k.title("Números do mês");
   const GREEN = [18, 140, 76], RED = [179, 38, 30], NEU = [74, 83, 104];
   const nums = [["leiteDia", "Leite produzido", "L/dia", 0], ["lPorVL", "Média das vacas em lactação", "L/vaca/dia", 1], ["pctLact", "Vacas em lactação / total de vacas", "%", 0], ["pctVacasReb", "Vacas em lactação / total do rebanho", "%", 0],
     ["ccs", "CCS do tanque", "mil cél/mL", 0], ["cbt", "CBT do tanque", "mil UFC/mL", 0], ["del", "DEL médio (vacas em lactação)", "dias", 0], ["preco", "Preço do leite", "R$/L", 2]].filter(x => isNum(c[x[0]]));
-  const cw = (k.tw - 6) / 2, ch = 17;
-  nums.forEach((x, i) => { const col = i % 2; if (col === 0) k.need(ch + 3); const X = k.mg + col * (cw + 6), Y = k.y;
+  const cw = (k.tw - 8) / 2, ch = 30;
+  nums.forEach((x, i) => { const col = i % 2; if (col === 0) k.need(ch + 5); const X = k.mg + col * (cw + 8), Y = k.y;
     let st = tileState(x[0], c[x[0]], M); if (x[0] === "preco" && p && isNum(p.preco)) st = c.preco >= p.preco; const cl = st == null ? NEU : st ? GREEN : RED;
-    d.setFillColor(...(st == null ? [242, 244, 248] : st ? [231, 245, 237] : [251, 235, 233])); d.roundedRect(X, Y, cw, ch, 2, 2, "F"); d.setFillColor(...cl); d.rect(X, Y, 1.4, ch, "F");
-    d.setFont("helvetica", "normal"); d.setFontSize(8.6); d.setTextColor(74, 83, 104); d.text(pdfTxt(x[1]), X + 5, Y + 5.6);
-    d.setFont("helvetica", "bold"); d.setFontSize(14); d.setTextColor(...cl); const vs = (x[0] === "preco" ? "R$ " : "") + fmt(c[x[0]], x[3]); d.text(pdfTxt(vs), X + 5, Y + 13);
-    const vw = d.getTextWidth(pdfTxt(vs)); d.setFont("helvetica", "normal"); d.setFontSize(8.6); d.text(pdfTxt(x[0] === "preco" ? "por litro" : x[2]), X + 6.5 + vw, Y + 13);
+    d.setFillColor(...(st == null ? [242, 244, 248] : st ? [231, 245, 237] : [251, 235, 233])); d.roundedRect(X, Y, cw, ch, 3, 3, "F"); d.setFillColor(...cl); d.rect(X, Y + 3, 2, ch - 6, "F");
+    d.setFont("helvetica", "normal"); d.setFontSize(10); d.setTextColor(74, 83, 104); d.text(pdfTxt(x[1]), X + 7, Y + 8);
+    d.setFont("helvetica", "bold"); d.setFontSize(24); d.setTextColor(...cl); const vs = (x[0] === "preco" ? "R$ " : "") + fmt(c[x[0]], x[3]); d.text(pdfTxt(vs), X + 7, Y + 20.5);
+    const vw = d.getTextWidth(pdfTxt(vs)); d.setFont("helvetica", "normal"); d.setFontSize(10); d.text(pdfTxt(x[0] === "preco" ? "por litro" : x[2]), X + 9 + vw, Y + 20.5);
     const pv = p ? p[x[0]] : null; const m = M[x[0]];
     const side = m && isNum(m.v) ? "meta " + (m.dir === "min" ? "≥ " : "≤ ") + fmt(m.v, x[3]) : isNum(pv) ? "mês anterior: " + fmt(pv, x[3]) : "";
-    if (side) { d.setTextColor(124, 132, 151); d.setFontSize(8); d.text(pdfTxt(side), X + cw - 3, Y + 13, {align: "right"}); }
-    if (col === 1 || i === nums.length - 1) k.y += ch + 3; });
-  d.setFont("helvetica", "normal"); d.setFontSize(8); d.setTextColor(124, 132, 151); k.need(6); d.text(pdfTxt("Verde: dentro da meta da fazenda. Vermelho: fora da meta."), k.mg, k.y + 1); k.y += 8;
+    const st2 = st == null ? "" : st ? (x[0] === "preco" ? "subiu ou manteve" : "dentro da meta") : (x[0] === "preco" ? "caiu no mês" : "fora da meta");
+    d.setFontSize(8.6); d.setTextColor(124, 132, 151); if (side) d.text(pdfTxt(side), X + 7, Y + 26.5); if (st2) { d.setFont("helvetica", "bold"); d.setTextColor(...cl); d.text(pdfTxt(st2), X + cw - 4, Y + 26.5, {align: "right"}); }
+    if (col === 1 || i === nums.length - 1) k.y += ch + 5; });
+  d.setFont("helvetica", "normal"); d.setFontSize(9); d.setTextColor(124, 132, 151); k.need(6); d.text(pdfTxt("Verde: dentro da meta da fazenda. Vermelho: fora da meta."), k.mg, k.y + 2);
+  k.header();
   // CMT
   const r = rec() || {}; const dd = r.d || {};
   if (isNum(dd.cmtVacas)) {
@@ -2707,7 +2743,9 @@ async function resumoBlob() {
     if (ruins.length) { const lost = ruins.filter(x => x.gmd < 0).length;
       k.text(`${ruins.length} abaixo da meta de ganho${lost ? `, sendo ${lost} com perda de peso` : ""}:`, 9.5, [179, 38, 30]);
       k.table([{h: "Animal", w: 1.2}, {h: "Idade (meses)", w: 1, r: 1}, {h: "Peso anterior (kg)", w: 1.2, r: 1}, {h: "Peso hoje (kg)", w: 1.1, r: 1}, {h: "GMD (kg/dia)", w: 1, r: 1}, {h: "Situação", w: 1.3}],
-        ruins.map(x => [x.id, isNum(x.idade) ? fmt(x.idade, 1) : "-", isNum(x.pa) ? fmt(x.pa, 0) : "-", fmt(x.peso, 0), fmt(x.gmd, 2), x.gmd < 0 ? "perdeu peso" : "ganho abaixo da meta"]));
+        ruins.map(x => { const lostW = x.gmd < 0; const col = lostW ? {c: [255, 255, 255], bg: [179, 38, 30], bold: 1} : {c: [255, 255, 255], bg: [214, 120, 24], bold: 1};
+          return {c: [x.id, isNum(x.idade) ? fmt(x.idade, 1) : "-", isNum(x.pa) ? fmt(x.pa, 0) : "-", fmt(x.peso, 0), fmt(x.gmd, 2), lostW ? "Perdeu peso" : "Abaixo da meta"], fill: lostW ? [253, 240, 238] : [255, 247, 236],
+            cc: {0: {bold: 1}, 4: {c: lostW ? [179, 38, 30] : [176, 92, 0], bold: 1}, 5: col}}; }));
     } else if (comG.length) k.text("Todos os animais pesados ganharam peso dentro da meta.", 9.5, [18, 140, 76]);
   }
   // o que foi feito
@@ -2774,6 +2812,17 @@ const _impAn = importAnimals;
 importAnimals = function (rows) { const r = importByHeader(rows); return r || _impAn(rows); };
 
 /* ---- eventos ---- */
+/* ---- celular: gaveta e barra de atalhos ---- */
+const BNAV = [["painel", "Painel"], ["ocorrencias", "Ocorrências"], ["cria", "Cria"], ["rotina", "Rotina"], ["qualidade", "Qualidade"]];
+(() => { const lg = document.querySelector(".side .logo"); if (lg) { const b = document.createElement("button"); b.id = "mBtn"; b.type = "button"; b.setAttribute("aria-label", "Abrir menu"); b.textContent = "☰"; lg.insertAdjacentElement("afterend", b);
+  b.onclick = () => { const o = document.body.classList.toggle("mopen"); b.textContent = o ? "✕" : "☰"; b.setAttribute("aria-label", o ? "Fechar menu" : "Abrir menu"); }; }
+  document.querySelector(".side").addEventListener("click", e => { if (e.target.closest("#menu button, .progbtn, #logoutBtn")) { document.body.classList.remove("mopen"); const m = $("#mBtn"); if (m) m.textContent = "☰"; } });
+  $("#farmSel").addEventListener("change", () => { document.body.classList.remove("mopen"); const m = $("#mBtn"); if (m) m.textContent = "☰"; });
+  const bn = $("#bnav"); bn.innerHTML = BNAV.map(([v, t]) => `<button type="button" data-bv="${v}">${svgIcon(v)}<span>${t}</span></button>`).join("");
+  bn.addEventListener("click", e => { const b = e.target.closest("[data-bv]"); if (!b) return; const m = document.querySelector(`#menu [data-view="${b.dataset.bv}"]`); if (m) m.click(); window.scrollTo(0, 0); });
+  const sync = () => { const menu = $("#menu"); bn.hidden = !menu || menu.hidden; bn.querySelectorAll("[data-bv]").forEach(b => { if (b.dataset.bv === S.view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }); };
+  new MutationObserver(sync).observe($("#menu"), {attributes: true, subtree: true, attributeFilter: ["hidden", "aria-current"]}); sync();
+})();
 content.addEventListener("click", async e => {
   const t = e.target.closest("[data-sancat],[data-gov],[data-ntipo],[data-notarm],[data-fx]"); if (!t) return;
   if (t.dataset.sancat) { ocSanCat = t.dataset.sancat; render(); return; }
