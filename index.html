@@ -309,6 +309,17 @@ input::-webkit-date-and-time-value{text-align:left}
  .box h3,.preview h3{overflow-wrap:anywhere}
  html,body{overflow-x:clip;max-width:100%}
 }
+
+/* v5.0: ordenar e filtrar o cadastro */
+.anctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 10px}
+.anctl label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.anctl select{height:34px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:13px}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--ink)}
+th.sortable.on{color:var(--ink)}
+.sarr{margin-left:4px;font-size:10px;opacity:.45}
+th.sortable.on .sarr{opacity:1}
+@media (max-width:820px){.anctl label{flex:1 1 140px}.anctl select{flex:1;min-width:0}.anctl .btn{flex:1 1 100%}}
 </style>
 <meta name="theme-color" content="#0b2a4a">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1067,10 +1078,6 @@ async function makePDF(btn) {
     const tp = talkingPoints(c, p, M).map(s => s.replace(/<[^>]+>/g, ""));
     doc.setTextColor(13, 21, 38); doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.text("Pontos para conversar", mg, y); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); y += 5.5;
     (tp.length ? tp : ["Todos os indicadores com meta estão dentro do esperado neste mês."]).forEach(t => { const ls = doc.splitTextToSize(pdfTxt("•  " + t), W - 2 * mg); if (y + ls.length * 4.3 > H - 10) return; doc.text(ls, mg, y); y += ls.length * 4.3 + 0.8; });
-    const comb = acoesOf(S.farmId).filter(x => x.tipo === "visita" && !x.feito);
-    if (comb.length) { if (y + 12 + comb.length * 6 > H - 10) { newPage("Combinados para a próxima visita"); y = 44; } else { y += 4; doc.setTextColor(13, 21, 38); doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.text("Combinados para a próxima visita", mg, y); y += 6; }
-      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(13, 21, 38);
-      comb.forEach(x => { if (y > H - 12) return; doc.setDrawColor(74, 83, 104); doc.rect(mg, y - 3.4, 3.8, 3.8); const ls = doc.splitTextToSize(pdfTxt(x.texto + (x.resp ? "  —  " + x.resp : "") + (x.prazo ? "  ·  até " + brDate(x.prazo) : "")), W - 2 * mg - 7); doc.text(ls, mg + 6, y); y += ls.length * 4.6 + 1.6; }); }
 
     // tabela simples
     const table = (y0, title, head, rows, widths, right) => {
@@ -1756,7 +1763,7 @@ function acaoBox(tipo, titulo, sub) {
 }
 function renderAcoes(el) {
   el.innerHTML = pageHead("Ações e combinados", false) + `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))">
-    ${acaoBox("visita", "Combinados para a próxima visita", "O que foi combinado com o produtor. Os pendentes saem no painel e no PDF do quadro.")}
+    ${acaoBox("visita", "Combinados para a próxima visita", "O que foi combinado com o produtor. Os pendentes saem no painel e no resumo enviado ao produtor.")}
     ${acaoBox("casa", "Tarefas para casa", "O que a equipe precisa fazer quando chegar no PDPL. Não sai nos relatórios do produtor.")}</div>`;
 }
 async function acoesUpdate(fn) { const list = clone(acoesOf(S.farmId)); fn(list); const ok = await saveAcoes(S.farmId, list); if (ok && S.view === "acoes") render(); return ok; }
@@ -2205,14 +2212,45 @@ function avisosHTML(list) {
 
 /* ---- Cadastro de animais (lista + ficha) ---- */
 let fichaIdx = null, anBusca = "", anSel = new Set(), ANVIS = {vaca: [], jov: []};
+let anSort = {vaca: {k: "del", d: 1}, jov: {k: "idade", d: 1}}, anFil = {vaca: "", jov: ""};
+const AN_COLS = {
+  vaca: [["id", "Brinco"], ["nome", "Nome"], ["lac", "Lactação"], ["parto", "Último parto"], ["del", "DEL"], ["ultIA", "Última inseminação"], ["estado", "Estado"], ["partoPrev", "Parto previsto"], ["secPrev", "Secagem prevista"], ["prePrev", "Entrada no pré-parto"]],
+  jov: [["id", "Brinco"], ["nome", "Nome"], ["nasc", "Nascimento"], ["idade", "Idade"], ["estado", "Estado"], ["mae", "Mãe"], ["peso", "Peso"], ["pesData", "Última pesagem"], ["lote", "Lote"], ["partoPrev", "Parto previsto"]]};
+function anKey(a, k, Wt, hoje) {
+  const r = repro(a), d = v => v ? (v instanceof Date ? v.getTime() : parseDate(typeof v === "string" ? v : isoDate(v)).getTime()) : null, w = Wt[normId(a.id)];
+  switch (k) {
+    case "id": return a.id || null; case "nome": return a.nome ? norm(a.nome) : null; case "lac": return isNum(a.lac) ? a.lac : null;
+    case "parto": return d(a.parto); case "ultIA": return d(a.ultIA); case "nasc": return d(a.nasc);
+    case "del": { const v = a.parto && r.est !== "Seca" ? dayDiff(hoje, parseDate(a.parto)) : null; return isNum(v) && v >= 0 ? v : null; }
+    case "idade": { const v = idadeMeses(a.nasc); return isNum(v) ? v : null; }
+    case "estado": return a.cat === "macho" ? "bezerro" : norm(r.show || "") || null; case "mae": return a.mae || null; case "lote": return a.lote || null;
+    case "peso": return w ? w.peso : null; case "pesData": return w ? d(w.data) : null;
+    case "partoPrev": return d(r.partoPrev); case "secPrev": return r.est === "Seca" ? null : d(r.secPrev); case "prePrev": return d(r.prePrev);
+  } return null;
+}
+function anSortList(list, t, Wt, hoje) {
+  const {k, d} = anSort[t];
+  return list.map(x => ({x, v: anKey(x.a || x, k, Wt, hoje)})).sort((p, q) => {
+    if (p.v == null && q.v == null) return String((p.x.a || p.x).id).localeCompare(String((q.x.a || q.x).id), "pt", {numeric: true});
+    if (p.v == null) return 1; if (q.v == null) return -1;
+    const c = typeof p.v === "number" && typeof q.v === "number" ? p.v - q.v : String(p.v).localeCompare(String(q.v), "pt", {numeric: true});
+    return c * d || String((p.x.a || p.x).id).localeCompare(String((q.x.a || q.x).id), "pt", {numeric: true}); }).map(o => o.x);
+}
+const anEst = a => a.cat === "macho" ? "Bezerro (macho)" : repro(a).show;
 const dcls = iso => { const d = daysTo(iso); return d === null ? "" : d < 0 ? "dt-late" : d <= 15 ? "dt-soon" : ""; };
 const dcell = iso => iso ? `<span class="${dcls(iso)}">${brDate(iso)}</span>` : "—";
 function anTablesHTML() {
   const Wt = lastWeights(S.farmId); const q = norm(anBusca);
   const match = a => !q || norm(a.id).includes(q) || norm(a.nome).includes(q);
-  const vac = A.map((a, i) => ({a, i})).filter(x => x.a.cat === "vaca" && match(x.a)).sort((x, y) => String(x.a.id).localeCompare(String(y.a.id), "pt", {numeric: true}));
-  const jov = A.map((a, i) => ({a, i})).filter(x => x.a.cat !== "vaca" && match(x.a)).sort((x, y) => (y.a.nasc || "").localeCompare(x.a.nasc || ""));
   const hoje = parseDate(todayIso());
+  const estV = [...new Set(A.filter(a => a.cat === "vaca").map(anEst))].sort(), estJ = [...new Set(A.filter(a => a.cat !== "vaca").map(anEst))].sort();
+  if (anFil.vaca && !estV.includes(anFil.vaca)) anFil.vaca = ""; if (anFil.jov && !estJ.includes(anFil.jov)) anFil.jov = "";
+  const vac = anSortList(A.map((a, i) => ({a, i})).filter(x => x.a.cat === "vaca" && match(x.a) && (!anFil.vaca || anEst(x.a) === anFil.vaca)), "vaca", Wt, hoje);
+  const jov = anSortList(A.map((a, i) => ({a, i})).filter(x => x.a.cat !== "vaca" && match(x.a) && (!anFil.jov || anEst(x.a) === anFil.jov)), "jov", Wt, hoje);
+  const th = (t, k, lab, n) => { const on = anSort[t].k === k; return `<th class="${n ? "n " : ""}sortable${on ? " on" : ""}" data-ansort="${t}:${k}" aria-sort="${on ? (anSort[t].d > 0 ? "ascending" : "descending") : "none"}" title="Ordenar por ${esc(lab)}">${esc(lab)}<span class="sarr">${on ? (anSort[t].d > 0 ? "▲" : "▼") : "↕"}</span></th>`; };
+  const ctl = (t, est) => `<div class="anctl"><label>Ordenar por <select data-anord="${t}">${AN_COLS[t].map(([k, l]) => `<option value="${k}" ${anSort[t].k === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
+    <button class="btn sm" data-andir="${t}" title="Inverter a ordem">${anSort[t].d > 0 ? "▲ Menor → maior" : "▼ Maior → menor"}</button>
+    <label>Estado <select data-anfil="${t}"><option value="">Todos</option>${est.map(e => `<option ${anFil[t] === e ? "selected" : ""}>${esc(e)}</option>`).join("")}</select></label></div>`;
   const cb = a => `<td class="cbx"><input type="checkbox" data-ansel="${esc(a.id)}" ${anSel.has(a.id) ? "checked" : ""} aria-label="Selecionar ${esc(a.id)}"></td>`;
   const vRows = vac.map(({a, i}) => { const r = repro(a); const del = a.parto && r.est !== "Seca" ? dayDiff(hoje, parseDate(a.parto)) : null;
     return `<tr class="rowlink" data-fi="${i}">${cb(a)}<td><b>${esc(a.id || "(sem brinco)")}</b></td><td>${esc(a.nome || "")}</td><td class="n">${isNum(a.lac) ? a.lac : "—"}</td><td>${a.parto ? brDate(a.parto) : "—"}</td><td class="n">${isNum(del) && del >= 0 ? del : "—"}</td>
@@ -2225,9 +2263,9 @@ function anTablesHTML() {
   const lotes = [...new Set(A.map(a => a.lote).filter(Boolean))].sort();
   const bulk = anSel.size ? `<div class="bulk"><b>${anSel.size} selecionado${anSel.size === 1 ? "" : "s"}</b><input type="text" id="bulkLote" list="dlLotes" placeholder="Novo lote" aria-label="Novo lote"><datalist id="dlLotes">${lotes.map(l => `<option value="${esc(l)}">`).join("")}</datalist>
     <button class="btn sm" data-fx="bulkLote">Mudar lote</button><button class="btn sm danger" data-fx="bulkDel">Excluir selecionados</button><button class="btn sm" data-fx="bulkClear">Limpar seleção</button></div>` : "";
-  return bulk + `<div class="box"><h3>Vacas <span class="note" style="font-weight:400">· ${vac.length}</span></h3><div class="tbl-wrap"><table class="tv"><thead><tr>${hcb("vaca", vac)}<th>Brinco</th><th>Nome</th><th class="n">Lac.</th><th>Último parto</th><th class="n">DEL</th><th>Última inseminação</th><th>Estado</th><th>Parto previsto</th><th>Secagem prevista</th><th>Entrada no pré-parto</th></tr></thead>
+  return bulk + `<div class="box"><h3>Vacas <span class="note" style="font-weight:400">· ${vac.length}</span></h3>${ctl("vaca", estV)}<div class="tbl-wrap"><table class="tv"><thead><tr>${hcb("vaca", vac)}${th("vaca", "id", "Brinco")}${th("vaca", "nome", "Nome")}${th("vaca", "lac", "Lac.", 1)}${th("vaca", "parto", "Último parto")}${th("vaca", "del", "DEL", 1)}${th("vaca", "ultIA", "Última inseminação")}${th("vaca", "estado", "Estado")}${th("vaca", "partoPrev", "Parto previsto")}${th("vaca", "secPrev", "Secagem prevista")}${th("vaca", "prePrev", "Entrada no pré-parto")}</tr></thead>
     <tbody>${vRows || `<tr><td colspan="11" class="note">Nenhuma vaca${q ? " encontrada" : " cadastrada"}.</td></tr>`}</tbody></table></div></div>
-    <div class="box"><h3>Novilhas <span class="note" style="font-weight:400">· ${jov.length}</span></h3><div class="tbl-wrap"><table class="tj"><thead><tr>${hcb("jov", jov)}<th>Brinco</th><th>Nome</th><th>Nascimento</th><th class="n">Idade (meses)</th><th>Estado</th><th>Mãe</th><th class="n">Peso (kg)</th><th>Última pesagem</th><th>Lote</th><th>Parto previsto</th></tr></thead>
+    <div class="box"><h3>Novilhas <span class="note" style="font-weight:400">· ${jov.length}</span></h3>${ctl("jov", estJ)}<div class="tbl-wrap"><table class="tj"><thead><tr>${hcb("jov", jov)}${th("jov", "id", "Brinco")}${th("jov", "nome", "Nome")}${th("jov", "nasc", "Nascimento")}${th("jov", "idade", "Idade (meses)", 1)}${th("jov", "estado", "Estado")}${th("jov", "mae", "Mãe")}${th("jov", "peso", "Peso (kg)", 1)}${th("jov", "pesData", "Última pesagem")}${th("jov", "lote", "Lote")}${th("jov", "partoPrev", "Parto previsto")}</tr></thead>
     <tbody>${jRows || `<tr><td colspan="11" class="note">Nenhuma novilha${q ? " encontrada" : " cadastrada"}.</td></tr>`}</tbody></table></div></div>`;
 }
 function renderAnimais(el) {
@@ -2438,14 +2476,11 @@ async function makeCadPDF(btn) {
   try {
     const f = farm(); const k = pdfKit("landscape", "Cadastro de animais", farmLabel(f) + (f.nome && f.produtor ? " · " + f.nome : "") + " — " + brDate(todayIso()));
     const Wt = lastWeights(S.farmId); const hoje = parseDate(todayIso());
-    const av = avisosAll(A);
-    if (av.length) { k.title("Avisos do rebanho"); const gn = Object.fromEntries(AV_GRP.map(g => [g[0], g[1]])); const avs = AV_GRP.flatMap(g => av.filter(x => (x.grp || "oc") === g[0]));
-      k.table([{h: "Grupo", w: 1.4}, {h: "Animal", w: 2}, {h: "Aviso", w: 4}, {h: "Data", w: 1.3}, {h: "Quando", w: 1.3}], avs.map(x => [gn[x.grp || "oc"], x.a.id + (x.a.nome ? " · " + x.a.nome : ""), x.tipo, brDate(x.data), quando(x.dias)])); }
-    const vac = A.filter(a => a.cat === "vaca").sort((x, y) => String(x.id).localeCompare(String(y.id), "pt", {numeric: true}));
+    const vac = anSortList(A.filter(a => a.cat === "vaca" && (!anFil.vaca || anEst(a) === anFil.vaca)), "vaca", Wt, hoje);
     k.title("Vacas (" + vac.length + ")");
     k.table([{h: "Brinco", w: 1.1}, {h: "Nome", w: 1.6}, {h: "Lac.", w: 0.6, r: 1}, {h: "Último parto", w: 1.3}, {h: "DEL", w: 0.7, r: 1}, {h: "Última inseminação", w: 1.4}, {h: "Estado", w: 1.2}, {h: "Parto previsto", w: 1.3}, {h: "Secagem prevista", w: 1.3}, {h: "Entrada no pré-parto", w: 1.4}],
       vac.map(a => { const r = repro(a); const del = a.parto && r.est !== "Seca" ? dayDiff(hoje, parseDate(a.parto)) : null; return [a.id, a.nome || "", isNum(a.lac) ? String(a.lac) : "-", a.parto ? brDate(a.parto) : "-", isNum(del) && del >= 0 ? String(del) : "-", a.ultIA ? brDate(a.ultIA) : "-", r.show, r.partoPrev ? brDate(r.partoPrev) : "-", r.est === "Seca" ? "seca" : r.secPrev ? brDate(r.secPrev) : "-", r.prePrev ? brDate(r.prePrev) : "-"]; }));
-    const jov = A.filter(a => a.cat !== "vaca").sort((x, y) => (y.nasc || "").localeCompare(x.nasc || ""));
+    const jov = anSortList(A.filter(a => a.cat !== "vaca" && (!anFil.jov || anEst(a) === anFil.jov)), "jov", Wt, hoje);
     k.title("Novilhas (" + jov.length + ")");
     k.table([{h: "Brinco", w: 1.1}, {h: "Nome", w: 1.4}, {h: "Nascimento", w: 1.2}, {h: "Idade (meses)", w: 1, r: 1}, {h: "Estado", w: 1.1}, {h: "Mãe", w: 1}, {h: "Peso (kg)", w: 0.9, r: 1}, {h: "Última pesagem", w: 1.2}, {h: "Lote", w: 0.8}, {h: "Parto previsto", w: 1.2}],
       jov.map(a => { const r = repro(a); const w = Wt[normId(a.id)]; const id = idadeMeses(a.nasc); return [a.id, a.nome || "", a.nasc ? brDate(a.nasc) : "-", isNum(id) ? fmt(id, 1) : "-", a.cat === "macho" ? "Bezerro (macho)" : r.show, a.mae || "-", w ? fmt(w.peso, 0) : "-", w ? brDate(w.data) : "-", a.lote || "-", r.partoPrev ? brDate(r.partoPrev) : "-"]; }));
@@ -2516,7 +2551,13 @@ content.addEventListener("input", e => {
   if (t.id === "anBusca") { anBusca = t.value; const b = document.getElementById("anTabs"); if (b) b.innerHTML = anTablesHTML(); return; }
   if (t.dataset.fk && fichaIdx != null && A[fichaIdx]) { const k = t.dataset.fk; A[fichaIdx][k] = k === "pn" || k === "lac" ? toNum(t.value) : t.value; if (k === "nasc") A[fichaIdx].nascEst = false; markAnim(); }
 });
+content.addEventListener("click", e => { const h = e.target.closest("[data-ansort],[data-andir]"); if (!h) return;
+  if (h.dataset.ansort) { const [t, k] = h.dataset.ansort.split(":"); anSort[t] = anSort[t].k === k ? {k, d: -anSort[t].d} : {k, d: 1}; }
+  else { const t = h.dataset.andir; anSort[t].d = -anSort[t].d; }
+  const b = document.getElementById("anTabs"); if (b) b.innerHTML = anTablesHTML(); });
 content.addEventListener("change", e => { const t = e.target;
+  if (t.dataset.anord) { anSort[t.dataset.anord] = {k: t.value, d: 1}; const b = document.getElementById("anTabs"); if (b) b.innerHTML = anTablesHTML(); return; }
+  if (t.dataset.anfil != null) { anFil[t.dataset.anfil] = t.value; const b = document.getElementById("anTabs"); if (b) b.innerHTML = anTablesHTML(); return; }
   if (t.dataset.ansel != null) { if (t.checked) anSel.add(t.dataset.ansel); else anSel.delete(t.dataset.ansel); const b = document.getElementById("anTabs"); if (b) b.innerHTML = anTablesHTML(); return; }
   if (t.dataset.anall) { const ids = ANVIS[t.dataset.anall] || []; ids.forEach(id => t.checked ? anSel.add(id) : anSel.delete(id)); const b = document.getElementById("anTabs"); if (b) b.innerHTML = anTablesHTML(); return; }
   if (t.dataset.fk && fichaIdx != null && A[fichaIdx]) { const k = t.dataset.fk; A[fichaIdx][k] = k === "pn" || k === "lac" ? toNum(t.value) : t.value; markAnim(); if (["cat", "estado", "ultIA", "parto", "nasc"].includes(k)) render(); } });
