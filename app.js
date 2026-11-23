@@ -2,7 +2,7 @@
    Carregado depois do código principal; troca o armazenamento do Claude pelo Firebase. */
 (function () {
 "use strict";
-const APP_VERSION = "4.3";
+const APP_VERSION = "4.4";
 const cfg = window.FIREBASE_CONFIG || {};
 const iso = () => new Date().toISOString();
 const ROLES = {pendente: "Aguardando aprovação", estagiario: "Estagiário", tecnico: "Técnico", admin: "Coordenação", bloqueado: "Bloqueado"};
