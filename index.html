@@ -516,10 +516,11 @@ function crStats(r, al, f) {
   const amap = new Map(al.map(a => [normId(a.id), a]));
   const rows = cr.rows.map(x => {
     const a = amap.get(normId(x.id)) || {}; const nasc = parseDate(a.nasc); const pn = isNum(a.pn) ? a.pn : null;
-    const pa = isNum(x.pa) ? x.pa : (prev ? ((prev.rows.find(y => normId(y.id) === normId(x.id) && isNum(y.peso)) || {}).peso ?? null) : null);
+    let pa = isNum(x.pa) ? x.pa : (prev ? ((prev.rows.find(y => normId(y.id) === normId(x.id) && isNum(y.peso)) || {}).peso ?? null) : null); let dR = dias;
+    if (!isNum(pa) && isNum(a.ultPeso) && parseDate(a.ultPesoData) && parseDate(a.ultPesoData) < dt) { pa = a.ultPeso; dR = dayDiff(dt, parseDate(a.ultPesoData)); }
     const idadeD = nasc ? dayDiff(dt, nasc) : null; const idade = isNum(idadeD) ? idadeD / MES : null;
     const peso = isNum(x.peso) ? x.peso : null;
-    const gmd = isNum(peso) && isNum(pa) && dias > 0 ? (peso - pa) / dias : null;
+    const gmd = isNum(peso) && isNum(pa) && dR > 0 ? (peso - pa) / dR : null;
     const gpp = isNum(peso) && isNum(pn) && idadeD > 0 ? (peso - pn) / idadeD : null;
     const ia = isNum(gpp) && gpp > 0 ? (P.pp - peso) / gpp / MES + idade : null;
     return {id: x.id, nasc: a.nasc, pn, idade, pa, peso, lote: x.lote || a.lote || "", gmd, gpp, ia, ipp: isNum(ia) ? ia + 9.5 : null};
@@ -2114,6 +2115,7 @@ function lastWeights(fid) {
   const m = {};
   farmMonths(fid).forEach(ym => { const r = recs()[recKey(fid, ym)]; if (!r || !r.cr) return; const d = r.cr.data || isoDate(midMonth(ym));
     (r.cr.rows || []).forEach(x => { if (isNum(x.peso)) m[normId(x.id)] = {peso: x.peso, data: d}; }); });
+  (fid === S.farmId && A && A._fid === fid ? A : animsOf(fid)).forEach(a => { if (!isNum(a.ultPeso) || !a.ultPesoData) return; const k = normId(a.id); if (!m[k] || m[k].data < a.ultPesoData) m[k] = {peso: a.ultPeso, data: a.ultPesoData}; });
   return m;
 }
 const quando = d => d < 0 ? `há ${-d} dia${d === -1 ? "" : "s"}` : d === 0 ? "hoje" : `em ${d} dia${d === 1 ? "" : "s"}`;
@@ -2181,6 +2183,7 @@ function fichaHist(a) {
   farmMonths().forEach(ym => { const r = recs()[recKey(S.farmId, ym)]; if (!r) return;
     const c = (r.cr && r.cr.rows || []).find(x => normId(x.id) === id && isNum(x.peso)); if (c) pes.push({data: r.cr.data || isoDate(midMonth(ym)), peso: c.peso, lote: c.lote});
     const p = (r.pes || []).find(x => normId(x.id) === id && (isNum(x.l) || isNum(x.ccs))); if (p) lei.push({data: r.dataPes || isoDate(midMonth(ym)), l: p.l, ccs: p.ccs}); });
+  if (isNum(a.ultPeso) && a.ultPesoData && !pes.some(x => x.data === a.ultPesoData)) { pes.push({data: a.ultPesoData, peso: a.ultPeso, lote: "importado"}); pes.sort((x, y) => x.data.localeCompare(y.data)); }
   return {oc, pes: pes.reverse(), lei: lei.reverse()};
 }
 function ocDesc(o) {
@@ -2209,7 +2212,7 @@ function renderFicha(el, i) {
     <div class="box"><h3>Identificação</h3><div class="fields">
       ${fi("id", "Brinco")}${fi("nome", "Nome")}
       <div class="field"><label for="fk_cat">Categoria</label><select id="fk_cat" data-fk="cat">${Object.entries(CAT_NOME).map(([k, v]) => `<option value="${k}"${a.cat === k ? " selected" : ""}>${v}</option>`).join("")}</select></div>
-      ${fi("nasc", "Data de nascimento", "date")}${fi("pn", "Peso ao nascer (kg)")}${fi("mae", "Mãe (brinco)")}${fi("lote", "Lote")}</div></div>
+      ${fi("nasc", "Data de nascimento", "date")}${fi("pn", "Peso ao nascer (kg)")}${fi("mae", "Mãe")}${fi("pai", "Pai (touro)")}${fi("lote", "Lote")}</div></div>
     ${isV || isN ? `<div class="box"><h3>Reprodução</h3><div class="fields">
       ${isV ? fi("lac", "Nº de lactações") + fi("parto", "Data do último parto", "date") : ""}${fi("ultIA", "Última inseminação", "date")}${fi("touro", "Touro ou sêmen")}
       <div class="field"><label for="fk_estado">Estado reprodutivo</label><select id="fk_estado" data-fk="estado">${est.map(s => `<option${r.est === s ? " selected" : ""}>${s}</option>`).join("")}</select></div>
@@ -2693,26 +2696,33 @@ async function resumoGo(btn, share) {
 /* ---- leitura de planilhas pelo cabeçalho (FarmTell e outras) ---- */
 const HDR = [["id", /^(n[o°º]?\.?\s*)?(do\s*)?brinco|^animal$|^identifica|^n[o°º]\.?\s*animal|^numero$|^num\.?$/], ["nome", /^nome/], ["cat", /^categ|^tipo$/], ["nasc", /nasc/], ["pn", /^peso.*nasc|^p\.?\s*nasc/],
   ["lote", /^lote/], ["parto", /(ult|ultimo|ultima|data|dt)\.?\s*(do\s*)?parto(?!.*prev)/], ["del", /^del$|dias\s*(em\s*)?lact|^dias\s*lac/], ["lac", /^(n[o°º]\.?\s*)?(de\s*)?lact|^#\s*lac|^lac\.?$|ordem.*parto|^n[o°º]\.?\s*partos?|^partos$/],
-  ["ultIA", /(ult|ultima|data|dt)\.?\s*(da\s*)?(ia|insem|cobert)|^ia$/], ["estado", /status|situa|^estado/], ["mae", /^m[aã]e/], ["touro", /touro|semen/], ["peso", /^peso(\s*atual)?$/]];
+  ["pesoData", /^data\s*(da\s*)?pesagem|^dt\.?\s*pesagem/], ["pai", /^pai$|^pai\s/], ["ultIA", /(ult|ultima|data|dt)\.?\s*(da\s*)?(ia|insem|cobert)|^ia$/], ["estado", /status|situa|^estado/], ["mae", /^m[aã]e/], ["touro", /touro|semen/], ["peso", /^peso(\s*atual)?$/]];
 const semAcento = x => norm(x).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 function headerMap(row) { const m = {}; row.forEach((c, i) => { const h = semAcento(String(c || "")).replace(/[_:]/g, " ").trim(); if (!h) return; for (const [k, re] of HDR) { if (m[k] == null && re.test(h)) { m[k] = i; break; } } }); return m.id != null && Object.keys(m).length >= 2 ? m : null; }
-function estadoDe(txt, cat) { const e = semAcento(txt || ""); if (!e) return ""; if (/negativ|dg\s*-/.test(e)) return cat === "vaca" ? "Vazia" : "Novilha"; if (/pren|gest|dg\s*\+|positiv/.test(e)) return "Prenhe"; if (/insem|serv|cobert/.test(e)) return "Inseminada"; if (/seca/.test(e)) return "Seca"; if (/descart/.test(e)) return "Descarte"; if (/vaz|abert|pev|lact|recem/.test(e)) return cat === "vaca" ? "Vazia" : "Novilha"; return ""; }
+function estadoDe(txt, cat) { const e = semAcento(txt || ""); if (!e) return ""; if (/negativ|dg\s*-/.test(e)) return cat === "vaca" ? "Vazia" : "Novilha"; if (/pren|gest|dg\s*\+|positiv/.test(e)) return "Prenhe"; if (/insem|serv|cobert/.test(e)) return "Inseminada"; if (/seca/.test(e)) return "Seca"; if (/descart/.test(e)) return "Descarte"; if (/novilh/.test(e)) return "Novilha"; if (/vaz|abert|pev|lact|recem/.test(e)) return cat === "vaca" ? "Vazia" : "Novilha"; return ""; }
 function importByHeader(rows) {
   let hi = -1, M = null; for (let i = 0; i < Math.min(rows.length, 12); i++) { const m = headerMap(rows[i]); if (m) { hi = i; M = m; break; } }
   if (!M) return null;
   let novos = 0, atual = 0; const hoje = parseDate(todayIso()); const body = rows.slice(hi + 1); const US = {};
-  ["nasc", "parto", "ultIA"].forEach(k => { if (M[k] == null) return; let us = false, br = false;
+  ["nasc", "parto", "ultIA", "pesoData"].forEach(k => { if (M[k] == null) return; let us = false, br = false;
     body.forEach(p => { const m0 = String(p[M[k]] ?? "").trim().match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/); if (!m0) return; if (+m0[2] > 12) us = true; if (+m0[1] > 12) br = true; });
-    US[k] = us && !br; });
-  const fixD = (k, v) => { if (!US[k]) return v; const m0 = v.match(/^(\d{1,2})([\/.-])(\d{1,2})\2(\d{2,4})$/); return m0 ? m0[3] + "/" + m0[1] + "/" + m0[4] : v; };
-  body.forEach(p => { const g0 = k => M[k] != null ? String(p[M[k]] ?? "").trim() : ""; const g = k => ["nasc", "parto", "ultIA"].includes(k) ? fixD(k, g0(k)) : g0(k); const id = normId(g("id")); if (!id || /total|media/i.test(id)) return;
+    US[k] = us ? (br ? "mix" : "us") : (br ? "br" : "?"); });
+  const vals = Object.values(US); const gUS = vals.includes("us") && !vals.includes("br");
+  const lim = isoDate(new Date(hoje.getTime() + 2 * 864e5));
+  const fixD = (k, v) => { const m0 = v.match(/^(\d{1,2})([\/.-])(\d{1,2})\2(\d{2,4})$/); if (!m0) return v;
+    const sw = m0[3] + "/" + m0[1] + "/" + m0[4]; const us = US[k] === "us" || (US[k] === "?" && gUS);
+    let out = us ? sw : v; const d1 = dtIn(out); if (d1 && d1 > lim && +m0[1] <= 12 && +m0[3] <= 12) { const alt = out === v ? sw : v; const d2 = dtIn(alt); if (d2 && d2 <= lim) out = alt; }
+    return out; };
+  body.forEach(p => { const g0 = k => M[k] != null ? String(p[M[k]] ?? "").trim() : ""; const g = k => ["nasc", "parto", "ultIA", "pesoData"].includes(k) ? fixD(k, g0(k)) : g0(k); const id = normId(g("id")); if (!id || /total|media/i.test(id)) return;
     let a = A.find(x => normId(x.id) === id); if (a) atual++; else { a = {id, cat: "", nasc: "", pn: null, lote: "", parto: ""}; A.push(a); novos++; }
     const cr = semAcento(g("cat")); const cat = cr.startsWith("vac") ? "vaca" : cr.startsWith("nov") ? "novilha" : cr.startsWith("bezerro") || cr.startsWith("mac") ? "macho" : cr.startsWith("bez") ? "bezerra" : "";
     if (g("nome")) a.nome = g("nome"); if (dtIn(g("nasc"))) { a.nasc = dtIn(g("nasc")); a.nascEst = false; } if (isNum(toNum(g("pn")))) a.pn = toNum(g("pn")); if (g("lote")) a.lote = g("lote");
     if (dtIn(g("parto"))) a.parto = dtIn(g("parto")); else if (isNum(toNum(g("del"))) && !a.parto) a.parto = isoDate(new Date(hoje.getTime() - toNum(g("del")) * 864e5));
-    if (isNum(toNum(g("lac")))) a.lac = toNum(g("lac")); if (dtIn(g("ultIA"))) a.ultIA = dtIn(g("ultIA")); if (g("mae")) a.mae = normId(g("mae")); if (g("touro")) a.touro = g("touro");
+    if (isNum(toNum(g("lac")))) a.lac = toNum(g("lac")); if (dtIn(g("ultIA"))) a.ultIA = dtIn(g("ultIA")); if (g("mae")) { const mv = g("mae"); const bi = A.find(x => normId(x.id) === normId(mv)); const bn = A.find(x => x.nome && semAcento(x.nome) === semAcento(mv)); a.mae = bi ? bi.id : bn ? bn.id : mv; }
+    if (g("touro")) a.touro = g("touro"); if (g("pai")) a.pai = g("pai");
+    if (isNum(toNum(g("peso")))) { a.ultPeso = toNum(g("peso")); a.ultPesoData = dtIn(g("pesoData")) || todayIso(); }
     a.cat = cat || a.cat || ((isNum(a.lac) && a.lac > 0) || a.parto ? "vaca" : a.nasc && -daysTo(a.nasc) / MES >= 12 ? "novilha" : "bezerra");
-    const e = estadoDe(g("estado"), a.cat); if (e) a.estado = e;
+    const e = estadoDe(g("estado"), a.cat); if (e && !(e === "Novilha" && a.cat !== "novilha")) a.estado = e;
     if (!a.nasc && nascFromBrinco(a.id)) { a.nasc = nascFromBrinco(a.id); a.nascEst = true; } });
   return {novos, atual, cols: Object.keys(M)};
 }
